@@ -1,5 +1,7 @@
 import faulthandler
 import logging
+import os
+import subprocess
 import sys
 import threading
 import traceback
@@ -75,7 +77,38 @@ def _install_exception_hooks() -> None:
     threading.excepthook = _thread_hook
 
 
+def _expand_shell_path() -> None:
+    """Expand PATH using the login shell.
+
+    macOS .app bundles launch with a minimal system PATH that omits locations
+    like /opt/homebrew/bin and ~/google-cloud-sdk/bin where gcloud/kubectl live.
+    Asking the login shell for its PATH and injecting it into os.environ fixes
+    subprocess calls to CLI tools for the lifetime of the process.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        shell = os.environ.get("SHELL", "/bin/zsh")
+        if "zsh" in shell:
+            cmd = "source ~/.zshrc 2>/dev/null; echo $PATH"
+        elif "bash" in shell:
+            cmd = "source ~/.bash_profile 2>/dev/null; source ~/.bashrc 2>/dev/null; echo $PATH"
+        else:
+            cmd = "echo $PATH"
+        result = subprocess.run(
+            [shell, "-l", "-c", cmd],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            os.environ["PATH"] = result.stdout.strip()
+    except Exception:  # noqa: BLE001
+        pass  # non-fatal — original PATH remains
+
+
 def main() -> None:
+    _expand_shell_path()
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",

@@ -10,8 +10,20 @@ A desktop admin console for Weaviate vector database clusters.
   <img width="800" height="500" alt="image" src="https://github.com/user-attachments/assets/4f0e7c3a-acf8-4518-b1db-47ad0828eef2" />
 </p>
 
+## Installation (macOS DMG)
 
-## Quick Start
+Download `WeavyAdmin-1.0.0.dmg` from the [Releases](https://github.com/Shah91n/WeavyAdmin/releases) page, open it, and drag **WeavyAdmin** to Applications.
+
+**First launch:** macOS will block the app with a security warning because it is not notarized. To open it:
+
+1. Click **Done** on the warning dialog
+2. Go to **System Settings → Privacy & Security**
+3. Scroll down to the Security section — you will see **"WeavyAdmin was blocked"**
+4. Click **Open Anyway**
+
+This is a one-time step per machine.
+
+## Quick Start (from source)
 
 ```bash
 pip install -r requirements.txt

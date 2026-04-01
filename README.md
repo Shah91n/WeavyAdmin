@@ -5,6 +5,12 @@ A PyQt6 desktop admin console for Weaviate vector database clusters.
 [![Weaviate](https://img.shields.io/static/v1?label=for&message=Weaviate%20%E2%9D%A4&color=green&style=flat-square)](https://weaviate.io/)
 [![GitHub Repo stars](https://img.shields.io/github/stars/Shah91n/WeavyAdmin?style=social)](https://github.com/Shah91n/WeavyAdmin)
 
+<p align="center">
+  <img width="400" height="200" alt="image" src="https://github.com/user-attachments/assets/6e7a1b18-5fb5-4f96-9404-d4d840c947e3" />
+  <img width="800" height="500" alt="image" src="https://github.com/user-attachments/assets/4f0e7c3a-acf8-4518-b1db-47ad0828eef2" />
+</p>
+
+
 ## Quick Start
 
 ```bash

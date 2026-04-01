@@ -672,6 +672,23 @@ QPushButton#aboutCheckUpdateButton {{
     padding: 4px 14px;
     font-size: 13px;
 }}
+
+QLabel#aboutUpdateStatus {{
+    font-size: 12px;
+    padding: 4px 0px;
+}}
+
+QLabel#aboutUpdateStatus[updateState="available"] {{
+    color: {COLOR_ACCENT_GREEN};
+}}
+
+QLabel#aboutUpdateStatus[updateState="uptodate"] {{
+    color: {COLOR_TEXT_SECONDARY};
+}}
+
+QLabel#aboutUpdateStatus[updateState="error"] {{
+    color: {COLOR_ERROR};
+}}
 """
 
 # ---------------------------------------------------------------------------

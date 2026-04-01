@@ -1,6 +1,6 @@
 # WeavyAdmin
 
-A PyQt6 desktop admin console for Weaviate vector database clusters.
+A desktop admin console for Weaviate vector database clusters.
 
 [![Weaviate](https://img.shields.io/static/v1?label=for&message=Weaviate%20%E2%9D%A4&color=green&style=flat-square)](https://weaviate.io/)
 [![GitHub Repo stars](https://img.shields.io/github/stars/Shah91n/WeavyAdmin?style=social)](https://github.com/Shah91n/WeavyAdmin)

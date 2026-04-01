@@ -1,0 +1,5 @@
+weaviate-client
+weaviate-client[agents]
+requests
+PyQt6
+python-dotenv

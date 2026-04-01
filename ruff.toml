@@ -1,0 +1,28 @@
+# Ruff configuration for WeavyAdmin
+# Docs: https://docs.astral.sh/ruff/configuration/
+
+target-version = "py310"
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (undefined names, unused imports, etc.)
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade (modernise Python syntax)
+    "B",   # flake8-bugbear (common bugs and design issues)
+    "C4",  # flake8-comprehensions (cleaner list/dict/set expressions)
+    "SIM", # flake8-simplify (simplifiable code)
+]
+ignore = [
+    "E501", # line too long — handled by formatter
+    "B008", # do not perform function calls in default args (Qt patterns need this)
+]
+
+[lint.isort]
+known-first-party = ["core", "features", "shared", "app", "dialogs"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

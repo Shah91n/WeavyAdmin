@@ -23,12 +23,28 @@ Download `WeavyAdmin-1.0.0.dmg` from the [Releases](https://github.com/Shah91n/W
 
 This is a one-time step per machine.
 
-## Quick Start (from source)
+## Run from Source
+
+**Requirements:** Python 3.10+
 
 ```bash
+git clone https://github.com/Shah91n/WeavyAdmin.git
+cd WeavyAdmin
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
+
+**Optional tools** (only needed for Kubernetes / cloud infra features):
+
+| Tool | Purpose |
+|------|---------|
+| `gcloud` + `kubectl` | GCP GKE cluster access |
+| `aws` CLI v2 + `kubectl` | AWS EKS cluster access |
+| `go` | Flame graphs in pod/cluster profiling |
+
+Install these via your system package manager (Homebrew on macOS) and ensure they are on your PATH.
 
 ## Features
 

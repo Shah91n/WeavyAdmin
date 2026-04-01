@@ -1,13 +1,10 @@
 """
-PyInstaller runtime hook — fixes app crash on launch (macOS).
+PyInstaller runtime hook — resolves package metadata inside a macOS .app bundle.
 
-Problem: weaviate calls importlib.metadata.version("protobuf") at import time.
-PyInstaller puts .dist-info folders in Contents/Resources/, but
-importlib.metadata only searches Contents/Frameworks/, so it raises
-PackageNotFoundError and the app crashes immediately.
-
-Fix: scan both locations at startup and patch importlib.metadata.version
-to fall back to reading the METADATA file directly when a package isn't found.
+PyInstaller places .dist-info folders in Contents/Resources/, but
+importlib.metadata only searches Contents/Frameworks/. This hook scans
+both locations at startup and patches importlib.metadata.version to fall
+back to reading the METADATA file directly when a package is not found.
 """
 
 import importlib.metadata

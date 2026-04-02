@@ -3,8 +3,8 @@ LB Traffic widget – displays HTTP Load Balancer / ALB traffic for the
 active Weaviate Cloud cluster (GCP or AWS).
 
 This view is provider-agnostic.  The caller supplies a *worker factory*
-(a zero-argument callable that returns a QThread with ``traffic_ready``,
-``progress``, and ``error`` signals) and a display label string.
+(a callable that accepts a time-window string and returns a QThread with
+``traffic_ready``, ``progress``, and ``error`` signals) and a display label.
 
 Components
 ----------
@@ -55,6 +55,21 @@ from shared.styles.infra_qss import (
 from shared.worker_mixin import WorkerMixin
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Time window options
+# ---------------------------------------------------------------------------
+# Each tuple: (display label, value passed to worker factory)
+# GCP passes the value directly to --freshness; AWS converts via _SINCE_MAP.
+
+_TIME_WINDOWS: list[tuple[str, str]] = [
+    ("Last 1 hour", "1h"),
+    ("Last 12 hours", "12h"),
+    ("Last 24 hours", "1d"),
+    ("Last 3 days", "3d"),
+    ("Last 5 days", "5d"),
+    ("Last 7 days", "7d"),
+]
 
 # ---------------------------------------------------------------------------
 # Column definitions
@@ -159,7 +174,8 @@ class LBTrafficView(QWidget, WorkerMixin):
     Parameters
     ----------
     worker_factory:
-        A zero-argument callable that returns a QThread with
+        A callable that accepts a time-window string (e.g. ``"1h"``,
+        ``"1d"``, ``"7d"``) and returns a QThread with
         ``traffic_ready(list)``, ``progress(str)``, and ``error(str)``
         signals.  Created fresh on each fetch.
     display_label:
@@ -170,7 +186,7 @@ class LBTrafficView(QWidget, WorkerMixin):
 
     def __init__(
         self,
-        worker_factory: Callable[[], QThread],
+        worker_factory: Callable[[str], QThread],
         display_label: str,
         parent: QWidget | None = None,
     ) -> None:
@@ -183,9 +199,7 @@ class LBTrafficView(QWidget, WorkerMixin):
 
         self.setStyleSheet(INFRA_STYLESHEET)
         self._build_ui()
-
-        # Auto-fetch on open
-        self.fetch_traffic()
+        self._update_status(self._display_label)
 
     def cleanup(self) -> None:
         self._alive = False
@@ -196,15 +210,19 @@ class LBTrafficView(QWidget, WorkerMixin):
     # ------------------------------------------------------------------
 
     def fetch_traffic(self) -> None:
-        """Fetch the latest LB traffic entries."""
+        """Fetch LB traffic for the selected time window."""
         if self._worker is not None:
             self._detach_worker()
 
-        self._set_controls_enabled(False)
-        self._update_status("Fetching LB traffic …")
-        self._table.setRowCount(0)
+        idx = self._time_combo.currentIndex()
+        label, since = _TIME_WINDOWS[idx]
 
-        self._worker = self._worker_factory()
+        self._set_controls_enabled(False)
+        self._update_status(f"Fetching LB traffic ({label}) …")
+        # Keep the current table rows visible while the new fetch is in
+        # progress — they are replaced atomically in _on_traffic_ready.
+
+        self._worker = self._worker_factory(since)
         self._worker.traffic_ready.connect(self._on_traffic_ready)  # type: ignore[attr-defined]
         self._worker.progress.connect(self._update_status)  # type: ignore[attr-defined]
         self._worker.error.connect(self._on_error)  # type: ignore[attr-defined]
@@ -228,9 +246,27 @@ class LBTrafficView(QWidget, WorkerMixin):
         row.setContentsMargins(8, 6, 8, 6)
         row.setSpacing(8)
 
+        # Time window selector
+        time_label = QLabel("Time window:")
+        time_label.setObjectName("infraStatusLabel")
+        row.addWidget(time_label)
+
+        self._time_combo = QComboBox()
+        self._time_combo.setObjectName("infraFilterCombo")
+        for display, _ in _TIME_WINDOWS:
+            self._time_combo.addItem(display)
+        self._time_combo.setCurrentIndex(0)
+        self._time_combo.setToolTip(
+            "How far back to fetch traffic logs.\nA shorter window is faster — use 1h or 12h first."
+        )
+        row.addWidget(self._time_combo)
+
         self._refresh_btn = QPushButton("Fetch Traffic")
         self._refresh_btn.setObjectName("infraRefreshBtn")
-        self._refresh_btn.setToolTip("Fetch the latest LB traffic (up to 5,000 entries)")
+        self._refresh_btn.setToolTip(
+            "Fetch LB traffic for the selected time window.\n"
+            "Choose a time window first, then click here."
+        )
         self._refresh_btn.clicked.connect(self.fetch_traffic)
         row.addWidget(self._refresh_btn)
 
@@ -317,6 +353,9 @@ class LBTrafficView(QWidget, WorkerMixin):
         try:
             self._all_entries = entries
             self._apply_filter()
+            # Default sort: newest entries at the top
+            if self._table.rowCount() > 0:
+                self._table.sortItems(COL_TIMESTAMP, Qt.SortOrder.DescendingOrder)
             count = len(entries)
             self._update_status(
                 f"{count:,} entr{'y' if count == 1 else 'ies'} loaded  |  {self._display_label}"
@@ -465,6 +504,7 @@ class LBTrafficView(QWidget, WorkerMixin):
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         self._refresh_btn.setEnabled(enabled)
+        self._time_combo.setEnabled(enabled)
         self._search_bar.setEnabled(enabled)
         self._excl_field_combo.setEnabled(enabled)
         self._excl_bar.setEnabled(enabled)

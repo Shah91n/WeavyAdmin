@@ -18,9 +18,10 @@ class AWSLBTrafficWorker(QThread):
     cluster_id:
         Weaviate cluster ID extracted from the URL
         (e.g. ``kckx8mixq6cnpwbupqfgeq``).
-    limit:
-        Maximum number of log lines to tail from the gateway pod
-        (default 50,000).
+    since:
+        How far back to fetch logs.  Accepts the shared time-window values
+        (``"1h"``, ``"12h"``, ``"1d"``, ``"3d"``, ``"5d"``, ``"7d"``).
+        Default ``"1h"``.
 
     Signals
     -------
@@ -39,19 +40,20 @@ class AWSLBTrafficWorker(QThread):
     def __init__(
         self,
         cluster_id: str,
-        limit: int = 50_000,
+        since: str = "1h",
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.cluster_id = cluster_id
-        self.limit = limit
+        self.since = since
 
     def run(self) -> None:
         try:
             self.progress.emit(
-                f"Discovering gateway pod and fetching traffic for cluster '{self.cluster_id}' …"
+                f"Discovering gateway pod and fetching traffic "
+                f"for cluster '{self.cluster_id}' (last {self.since}) …"
             )
-            fetcher = AWSLBTraffic(self.cluster_id, self.limit)
+            fetcher = AWSLBTraffic(self.cluster_id, since=self.since)
             entries = fetcher.fetch()
             self.traffic_ready.emit(entries)
         except Exception as exc:

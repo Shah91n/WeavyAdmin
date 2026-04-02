@@ -359,7 +359,7 @@ class DiagnoseView(QWidget, WorkerMixin):
 
     def _render_shard_consistency(self, data: dict):
         self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("🔄  Shard Consistency Check"))
+        self._root.addWidget(_section_title("Shard Consistency Check"))
 
         self._shard_section_container = QWidget()
         self._shard_section_layout = QVBoxLayout(self._shard_section_container)
@@ -499,7 +499,7 @@ class DiagnoseView(QWidget, WorkerMixin):
 
     def _render_replication_summary(self, diag: dict):
         self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("🔄  Replication Configuration Summary"))
+        self._root.addWidget(_section_title("Replication Configuration Summary"))
 
         issues = diag.get("replication_issues", [])
         if issues:
@@ -587,7 +587,7 @@ class DiagnoseView(QWidget, WorkerMixin):
             section = _CollapsibleSection(name, icon, expanded=False)
 
             # Compression details
-            comp_hdr = QLabel("🗜️  Compression Configuration")
+            comp_hdr = QLabel("Compression Configuration")
             comp_hdr.setObjectName("diagSubHeader")
             section.body_layout.addWidget(comp_hdr)
             for detail in check["compression"]["details"]:
@@ -597,7 +597,7 @@ class DiagnoseView(QWidget, WorkerMixin):
                 section.body_layout.addWidget(lbl)
 
             # Replication details
-            rep_hdr = QLabel("🔄  Replication Configuration")
+            rep_hdr = QLabel("Replication Configuration")
             rep_hdr.setObjectName("diagSubHeader")
             section.body_layout.addWidget(rep_hdr)
             for detail in check["replication"]["details"]:

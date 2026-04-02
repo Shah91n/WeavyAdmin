@@ -19,8 +19,9 @@ class LBTrafficWorker(QThread):
     cluster_id:
         Weaviate cluster ID extracted from the URL
         (e.g. ``cttmbwrjzvpevk7rl5g``).
-    limit:
-        Maximum number of entries to retrieve (default 5,000).
+    freshness:
+        How far back to fetch logs, passed directly to ``gcloud --freshness``
+        (e.g. ``"1h"``, ``"12h"``, ``"1d"``, ``"7d"``).  Default ``"1h"``.
 
     Signals
     -------
@@ -40,20 +41,21 @@ class LBTrafficWorker(QThread):
         self,
         project_id: str,
         cluster_id: str,
-        limit: int = 5_000,
+        freshness: str = "1h",
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.project_id = project_id
         self.cluster_id = cluster_id
-        self.limit = limit
+        self.freshness = freshness
 
     def run(self) -> None:
         try:
             self.progress.emit(
-                f"Fetching LB traffic for '{self.cluster_id}' in project '{self.project_id}' …"
+                f"Fetching LB traffic for '{self.cluster_id}' "
+                f"in project '{self.project_id}' (last {self.freshness}) …"
             )
-            fetcher = GCPLBTraffic(self.project_id, self.cluster_id, self.limit)
+            fetcher = GCPLBTraffic(self.project_id, self.cluster_id, freshness=self.freshness)
             entries = fetcher.fetch()
             self.traffic_ready.emit(entries)
         except Exception as exc:

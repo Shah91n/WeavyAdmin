@@ -33,7 +33,7 @@ features/                        One package per feature — view + worker, full
   ingest/                        Data ingest view + worker
   multitenancy/                  MT availability worker, tenant lookup worker
   objects/                       Read view + load/fetch/delete/update workers
-  query/                         Query tool + agent views and workers
+  query/                         Query agent view and worker
   rbac/                          RBAC manager view + workers
   request_log/                   HTTP request log view
   schema/                        Schema worker

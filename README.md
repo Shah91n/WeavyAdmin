@@ -53,11 +53,10 @@ Install these via your system package manager (Homebrew on macOS) and ensure the
 - **Shards Details** — all shards with search and filter
 - **Shards Indexing Status** — view every shard replica, bulk set READONLY → READY, multi-select actions
 - **Shard Rebalancer** — COPY/MOVE replica operations, compute and apply a balance plan, monitor replication operations (requires `REPLICA_MOVEMENT_ENABLED=true`)
-- **Collection Management** — create (Custom Schema or CSV), query, aggregate, delete
+- **Collection Management** — create (Custom Schema or CSV), aggregate, delete
 - **Schema Diagnostics** — cluster health checks, shard consistency, compression and replication analysis
 - **RBAC Manager** — create/edit/delete roles, manage DB users and OIDC groups, assign/revoke roles
 - **RBAC Report & Logs** — aggregated insights and authorization audit log viewer
-- **Query Tool** — Python query scratchpad against any collection
 - **Query Agent** — natural-language chat interface using the Weaviate Query Agent (Weaviate Cloud only)
 - **CSV Ingestion** — drag-and-drop CSV import with MT and BYOV support
 - **Backups** — create, restore, cancel backups; usage statistics report
@@ -88,7 +87,7 @@ features/            One package per feature — view + worker, fully self-conta
   ingest/            CSV import
   multitenancy/      Tenant availability + lookup
   objects/           Read, update, delete objects
-  query/             Query tool + query agent
+  query/             Query agent
   rbac/              RBAC manager
   request_log/       Live HTTP/gRPC request log viewer
   schema/            Schema loader

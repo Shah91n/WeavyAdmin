@@ -41,14 +41,16 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-# Maximum entries to fetch per call
-DEFAULT_LIMIT = 5_000
-
 # Subprocess timeout in seconds for gcloud logging read
 FETCH_TIMEOUT = 300
 
-# How far back to look (gcloud --freshness flag, e.g. "7d", "30d")
-DEFAULT_FRESHNESS = "7d"
+# How far back to look (gcloud --freshness flag, e.g. "1h", "1d", "7d")
+DEFAULT_FRESHNESS = "1h"
+
+# Maximum entries returned per fetch.  Applied server-side by Cloud Logging so
+# only cluster-matching entries count toward this cap — unrelated traffic is
+# never downloaded.  Stops the download early on high-traffic clusters.
+_ENTRY_CAP = 5_000
 
 
 # ---------------------------------------------------------------------------
@@ -67,23 +69,21 @@ class GCPLBTraffic:
     cluster_id:
         The Weaviate cluster ID extracted from the URL
         (e.g. ``cttmbwrjzvpevk7rl5g``).  Used to narrow the log filter.
-    limit:
-        Maximum number of log entries to retrieve (default 5,000).
     freshness:
         How far back to look, passed to ``gcloud --freshness``
-        (default ``"30d"``).
+        (e.g. ``"1h"``, ``"12h"``, ``"1d"``, ``"7d"``).
+        Default is ``"1h"``.  No ``--limit`` flag is applied; the time
+        window alone controls how many entries are returned.
     """
 
     def __init__(
         self,
         project_id: str,
         cluster_id: str,
-        limit: int = DEFAULT_LIMIT,
         freshness: str = DEFAULT_FRESHNESS,
     ) -> None:
         self.project_id = project_id
         self.cluster_id = cluster_id
-        self.limit = limit
         self.freshness = freshness
 
     def fetch(self) -> list[dict]:
@@ -109,10 +109,10 @@ class GCPLBTraffic:
             "logging",
             "read",
             filter_str,
-            "--limit",
-            str(self.limit),
             "--freshness",
             self.freshness,
+            "--limit",
+            str(_ENTRY_CAP),
             "--format",
             "json",
             "--project",
@@ -120,11 +120,11 @@ class GCPLBTraffic:
         ]
 
         logger.info(
-            "Fetching GCP LB logs: project=%s  cluster_id=%s  limit=%d  freshness=%s",
+            "Fetching GCP LB logs: project=%s  cluster_id=%s  freshness=%s  cap=%d",
             self.project_id,
             self.cluster_id,
-            self.limit,
             self.freshness,
+            _ENTRY_CAP,
         )
         logger.debug("Running: %s", " ".join(cmd))
 
@@ -133,7 +133,7 @@ class GCPLBTraffic:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=FETCH_TIMEOUT,
             )
         except FileNotFoundError as err:
             raise RuntimeError(
@@ -141,7 +141,10 @@ class GCPLBTraffic:
                 "and 'gcloud' is on your PATH."
             ) from err
         except subprocess.TimeoutExpired as err:
-            raise RuntimeError("gcloud logging read timed out after 300 seconds.") from err
+            raise RuntimeError(
+                f"gcloud logging read timed out after {FETCH_TIMEOUT} seconds "
+                f"(freshness={self.freshness}). Try a shorter time window."
+            ) from err
 
         if result.returncode != 0:
             stderr = result.stderr.strip()
@@ -213,6 +216,11 @@ class GCPLBTraffic:
                 "raw": json.dumps(raw, ensure_ascii=False),
             }
 
-        except Exception as exc:
-            logger.warning("Could not parse LB log entry: %s", exc)
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            logger.warning(
+                "Could not parse LB log entry (insert_id=%s): %s: %s",
+                raw.get("insertId", "unknown") if isinstance(raw, dict) else "unknown",
+                type(exc).__name__,
+                exc,
+            )
             return None

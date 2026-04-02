@@ -237,27 +237,21 @@ class AWSK8sBridge:
             return None
 
     def _ns_from_ingress(self, cluster_id: str) -> str | None:
-        """Grep ingress/virtualservice/httproute YAML for the cluster_id."""
-        cmd = (
-            f"kubectl get ingress,virtualservice,httproute -A -o yaml "
-            f'| grep -B 20 "{cluster_id}" | grep "namespace:"'
-        )
+        """Search ingress/virtualservice/httproute YAML for the cluster_id."""
+        cmd = ["kubectl", "get", "ingress,virtualservice,httproute", "-A", "-o", "yaml"]
         try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
-            return self._first_namespace(result.stdout)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            return self._grep_context(result.stdout, cluster_id, context=20)
         except subprocess.TimeoutExpired:
             logger.warning("Ingress grep timed out")
             return None
 
     def _ns_from_pod_annotations(self, cluster_id: str) -> str | None:
-        """Grep weaviate pod YAML for the cluster_id."""
-        cmd = (
-            f"kubectl get pods -A -l app=weaviate -o yaml "
-            f'| grep -B 30 "{cluster_id}" | grep "namespace:"'
-        )
+        """Search weaviate pod YAML for the cluster_id."""
+        cmd = ["kubectl", "get", "pods", "-A", "-l", "app=weaviate", "-o", "yaml"]
         try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
-            return self._first_namespace(result.stdout)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            return self._grep_context(result.stdout, cluster_id, context=30)
         except subprocess.TimeoutExpired:
             logger.warning("Pod annotation grep timed out")
             return None
@@ -291,6 +285,25 @@ class AWSK8sBridge:
             m = re.search(r"namespace:\s*(\S+)", line)
             if m and m.group(1) not in seen:
                 seen.append(m.group(1))
+        return seen[-1] if seen else None
+
+    @staticmethod
+    def _grep_context(yaml_text: str, cluster_id: str, context: int = 20) -> str | None:
+        """Replicate: grep -B {context} '{cluster_id}' | grep 'namespace:'
+
+        For each line containing cluster_id, inspect the preceding `context`
+        lines and collect unique namespace values.  Returns the last match,
+        which is the most specific one — identical behaviour to the shell pipeline.
+        """
+        seen: list[str] = []
+        lines = yaml_text.splitlines()
+        for i, line in enumerate(lines):
+            if cluster_id in line:
+                start = max(0, i - context)
+                for ctx_line in lines[start:i]:
+                    m = re.search(r"namespace:\s*(\S+)", ctx_line)
+                    if m and m.group(1) not in seen:
+                        seen.append(m.group(1))
         return seen[-1] if seen else None
 
     @property

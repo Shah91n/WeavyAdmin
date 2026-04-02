@@ -258,7 +258,7 @@ class Sidebar(QWidget):
         self.cluster_tree.itemClicked.connect(self._on_tool_clicked)
         cluster_layout.addWidget(self.cluster_tree)
 
-        # Server section (Logs, Request Logs, Query Tool)
+        # Server section (Logs, Request Logs)
         server_container = QWidget()
         server_layout = QVBoxLayout(server_container)
         server_layout.setContentsMargins(0, 0, 0, 0)
@@ -281,7 +281,6 @@ class Sidebar(QWidget):
             "Pod Profiling": "🔬",
             "Cluster Profiling": "🧬",
             "Request Logs": "📄",
-            "Query Tool": "🔎",
         }
         # Items that require a K8s namespace to be functional
         _INFRA_LABELS = {
@@ -302,7 +301,6 @@ class Sidebar(QWidget):
             "Pod Profiling",
             "Cluster Profiling",
             "Request Logs",
-            "Query Tool",
         ]:
             icon = _server_icons.get(label, "")
             item = QTreeWidgetItem(self.server_tree, [f"{icon}  {label}"])
@@ -429,7 +427,7 @@ class Sidebar(QWidget):
                 "properties": "📝",
                 "invertedIndexConfig": "🔍",
                 "multiTenancyConfig": "👥",
-                "replicationConfig": "🔄",
+                "replicationConfig": "🗃️",
                 "shardingConfig": "🗂️",
             }
             for config_type in [

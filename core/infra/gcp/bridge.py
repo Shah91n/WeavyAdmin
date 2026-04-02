@@ -161,11 +161,8 @@ class GCPK8sBridge:
             raise BridgeError("Call authenticate() before discover_namespace().")
 
         cluster_id = self._target.cluster_id
-        shell_cmd = (
-            f"kubectl get ingress,virtualservice,httproute -A -o yaml "
-            f'| grep -B 20 "{cluster_id}" | grep "namespace:"'
-        )
-        logger.info("Namespace discovery command: %s", shell_cmd)
+        kubectl_cmd = ["kubectl", "get", "ingress,virtualservice,httproute", "-A", "-o", "yaml"]
+        logger.info("Namespace discovery command: %s", " ".join(kubectl_cmd))
 
         if self.dry_run:
             logger.debug("[dry-run] skipping namespace discovery")
@@ -174,31 +171,31 @@ class GCPK8sBridge:
 
         try:
             result = subprocess.run(
-                shell_cmd,
-                shell=True,
+                kubectl_cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
-            output = result.stdout.strip()
-            if not output:
+            # Replicate: grep -B 20 "{cluster_id}" | grep "namespace:"
+            # For each line containing cluster_id, inspect the 20 lines before it
+            # and collect any "namespace: <value>" entries.
+            namespaces: list[str] = []
+            lines = result.stdout.splitlines()
+            for i, line in enumerate(lines):
+                if cluster_id in line:
+                    start = max(0, i - 20)
+                    for ctx_line in lines[start:i]:
+                        m = re.search(r"namespace:\s*(\S+)", ctx_line)
+                        if m:
+                            ns = m.group(1)
+                            if ns not in namespaces:
+                                namespaces.append(ns)
+
+            if not namespaces:
                 raise BridgeError(
                     f"No namespace found for cluster_id '{cluster_id}'. "
                     "The cluster may not be authenticated or the workload may not exist."
                 )
-
-            # Each line looks like: "  namespace: customer-abc-uuid"
-            # Pick the last unique namespace that appears before the cluster_id match.
-            namespaces = []
-            for line in output.splitlines():
-                match = re.search(r"namespace:\s*(\S+)", line)
-                if match:
-                    ns = match.group(1)
-                    if ns not in namespaces:
-                        namespaces.append(ns)
-
-            if not namespaces:
-                raise BridgeError(f"Could not parse a namespace from output:\n{output}")
 
             # The last entry is the most specific match
             namespace = namespaces[-1]

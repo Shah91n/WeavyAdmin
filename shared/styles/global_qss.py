@@ -928,102 +928,6 @@ QPushButton#ingestStartButton:disabled {{
 """
 
 # ---------------------------------------------------------------------------
-# QSS — Query Tool View
-# ---------------------------------------------------------------------------
-
-_QSS_QUERY_TOOL = f"""
-QLabel#queryToolTitle {{
-    font-size: 14px;
-    font-weight: 600;
-    color: {COLOR_TEXT_PRIMARY};
-}}
-
-QPlainTextEdit#queryCodeEditor {{
-    background-color: {COLOR_SECONDARY_BG};
-    color: {COLOR_TEXT_PRIMARY};
-    border: 1px solid {COLOR_BORDER};
-    border-radius: 4px;
-    padding: 8px;
-    selection-background-color: {COLOR_SELECTION_BLUE};
-}}
-
-QPlainTextEdit#queryCodeEditor:focus {{
-    border: 1px solid {COLOR_ACCENT_GREEN};
-}}
-
-QLabel#queryStatusLabel,
-QLabel#queryRowCountLabel {{
-    color: {COLOR_TEXT_SECONDARY};
-    font-size: 11px;
-}}
-
-QLabel#queryStatusLabel[state="success"] {{
-    color: {COLOR_ACCENT_GREEN};
-}}
-
-QLabel#queryStatusLabel[state="error"] {{
-    color: {COLOR_ERROR};
-}}
-
-QPlainTextEdit#queryOutputText {{
-    background-color: {COLOR_PRIMARY_BG};
-    color: {COLOR_TEXT_SECONDARY};
-    border: 1px solid {COLOR_BORDER};
-    border-radius: 4px;
-    padding: 4px;
-}}
-
-QPlainTextEdit#queryOutputText[state="error"] {{
-    color: {COLOR_ERROR};
-    border: 1px solid {COLOR_ERROR};
-}}
-
-QTableView#queryTableView {{
-    background-color: {COLOR_SECONDARY_BG};
-    color: {COLOR_TEXT_PRIMARY};
-    gridline-color: {COLOR_BORDER};
-    border: 1px solid {COLOR_BORDER};
-    border-radius: 4px;
-}}
-
-QTableView#queryTableView::item {{
-    padding: 4px;
-}}
-
-QTableView#queryTableView::item:selected {{
-    background-color: {COLOR_HOVER};
-    color: {COLOR_ACCENT_GREEN};
-}}
-
-QTableView#queryTableView QHeaderView::section {{
-    background-color: {COLOR_PRIMARY_BG};
-    color: {COLOR_TEXT_PRIMARY};
-    padding: 4px;
-    border: none;
-    border-right: 1px solid {COLOR_BORDER};
-    border-bottom: 1px solid {COLOR_BORDER};
-}}
-
-QPushButton#queryExecuteButton {{
-    background-color: {COLOR_ACCENT_GREEN};
-    color: {COLOR_SECONDARY_BG};
-    padding: 6px 18px;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 12px;
-}}
-
-QPushButton#queryExecuteButton:hover {{
-    background-color: {COLOR_ACCENT_GREEN_HOVER};
-}}
-
-QPushButton#queryExecuteButton:disabled {{
-    background-color: {COLOR_BORDER};
-    color: {COLOR_DISABLED_TEXT};
-}}
-"""
-
-# ---------------------------------------------------------------------------
 # QSS — Dashboard
 # Sections: Cluster metric cards · Health Alerts · Quick Actions ·
 #           Node health cards · Environment · Enabled Modules
@@ -2345,7 +2249,6 @@ GLOBAL_STYLESHEET = (
     + _QSS_CREATE_COLLECTION_CHOICE
     + _QSS_REUSABLE
     + _QSS_INGEST
-    + _QSS_QUERY_TOOL
     + _QSS_DASHBOARD
     + _QSS_DIAGNOSE
     + _QSS_QUERY_AGENT

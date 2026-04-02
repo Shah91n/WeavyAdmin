@@ -17,8 +17,8 @@ Commands used::
     # 1. Discover the gateway pod
     kubectl get pods -n gateway -o name
 
-    # 2. Tail and filter logs
-    kubectl logs -n gateway <pod> --tail=<limit>
+    # 2. Fetch logs for the requested time window
+    kubectl logs -n gateway <pod> --since=<since>
     # (then Python-side grep for cluster_id)
 
 No AWS credentials or profile are needed here — kubectl must already be
@@ -55,7 +55,19 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_LIMIT = 50_000
+# Maps the shared time-window values (used across both providers) to the
+# duration format accepted by ``kubectl logs --since``.
+# kubectl supports "s", "m", "h" suffixes only — no "d".
+_SINCE_MAP: dict[str, str] = {
+    "1h": "1h",
+    "12h": "12h",
+    "1d": "24h",
+    "3d": "72h",
+    "5d": "120h",
+    "7d": "168h",
+}
+
+DEFAULT_SINCE = "1h"
 
 # ---------------------------------------------------------------------------
 # Istio/Envoy access-log regex
@@ -103,23 +115,28 @@ class AWSLBTraffic:
     cluster_id:
         The Weaviate cluster ID extracted from the URL
         (e.g. ``kckx8mixq6cnpwbupqfgeq``).  Used to filter log lines.
-    limit:
-        Maximum number of raw log lines to tail from the gateway pod
-        (default 50,000).
+    since:
+        How far back to fetch logs.  Accepts the shared time-window values
+        (``"1h"``, ``"12h"``, ``"1d"``, ``"3d"``, ``"5d"``, ``"7d"``) which
+        are automatically converted to the ``kubectl --since`` format.
+        Default is ``"1h"``.
     """
 
     def __init__(
         self,
         cluster_id: str,
-        limit: int = DEFAULT_LIMIT,
+        since: str = DEFAULT_SINCE,
     ) -> None:
         self.cluster_id = cluster_id
-        self.limit = limit
+        # Convert shared time-window value to kubectl --since format.
+        # Unknown values pass through unchanged so callers can supply
+        # raw kubectl durations (e.g. "30m") directly if needed.
+        self.since = _SINCE_MAP.get(since, since)
 
     def fetch(self) -> list[dict]:
         """
-        Discover the gateway pod, tail its logs, filter for this cluster,
-        and return parsed entries newest-first.
+        Discover the gateway pod, fetch logs for the requested time window,
+        filter for this cluster, and return parsed entries newest-first.
 
         Returns
         -------
@@ -134,10 +151,10 @@ class AWSLBTraffic:
         """
         pod = self._get_gateway_pod()
         logger.info(
-            "Fetching gateway logs: pod=%s  cluster_id=%s  limit=%d",
+            "Fetching gateway logs: pod=%s  cluster_id=%s  since=%s",
             pod,
             self.cluster_id,
-            self.limit,
+            self.since,
         )
         raw_lines = self._fetch_log_lines(pod)
 
@@ -200,8 +217,8 @@ class AWSLBTraffic:
 
     def _fetch_log_lines(self, pod: str) -> list[str]:
         """
-        Tail ``self.limit`` lines from the gateway pod and return only the
-        lines that contain ``self.cluster_id``.
+        Fetch logs from the gateway pod for the configured time window and
+        return only the lines that contain ``self.cluster_id``.
         """
         try:
             result = subprocess.run(
@@ -211,7 +228,7 @@ class AWSLBTraffic:
                     "-n",
                     "gateway",
                     pod,
-                    f"--tail={self.limit}",
+                    f"--since={self.since}",
                 ],
                 capture_output=True,
                 text=True,
@@ -220,7 +237,10 @@ class AWSLBTraffic:
         except FileNotFoundError as err:
             raise RuntimeError("kubectl not found on PATH.") from err
         except subprocess.TimeoutExpired as err:
-            raise RuntimeError("kubectl logs timed out after 120 seconds.") from err
+            raise RuntimeError(
+                f"kubectl logs timed out after 120 seconds (since={self.since}). "
+                "Try a shorter time window."
+            ) from err
 
         if result.returncode != 0:
             raise RuntimeError(
@@ -280,6 +300,11 @@ class AWSLBTraffic:
             entry["raw"] = json.dumps(entry, ensure_ascii=False)
             return entry
 
-        except Exception as exc:
-            logger.warning("Failed to build entry from matched line: %s", exc)
+        except (ValueError, KeyError, IndexError, AttributeError) as exc:
+            logger.warning(
+                "Failed to build entry from matched line (%.80s): %s: %s",
+                line,
+                type(exc).__name__,
+                exc,
+            )
             return None

@@ -64,7 +64,6 @@ from features.ingest.view import IngestView
 from features.multitenancy.worker import MTAvailabilityWorker
 from features.objects.read_view import ReadView
 from features.query.agent_view import QueryAgentView
-from features.query.tool_view import QueryToolView
 from features.rbac.manager_view import RBACManagerView
 from features.request_log.view import RequestLogView
 from features.shards.indexing_view import ShardsIndexingView
@@ -837,17 +836,6 @@ class MainWindow(QMainWindow):
             self.workspace.add_tab_with_id(log_view, tab_id, tab_label, worker=None)
             return
 
-        # Handle Query Tool (Server section)
-        elif tool_name == "Query Tool":
-            tab_id = "server:QueryTool"
-            tab_label = "🔍 Query Tool"
-            if tab_id in self.workspace.tab_id_to_index:
-                self.workspace.setCurrentIndex(self.workspace.tab_id_to_index[tab_id])
-                return
-            query_view = QueryToolView()
-            self.workspace.add_tab_with_id(query_view, tab_id, tab_label, worker=None)
-            return
-
         # Handle Query Agent (Cluster section) – natural-language Weaviate Query Agent
         elif tool_name == "Query Agent":
             tab_id = "cluster:QueryAgent"
@@ -876,8 +864,8 @@ class MainWindow(QMainWindow):
                     )
                     return
 
-                def factory(t=target) -> LBTrafficWorker:  # type: ignore[misc]
-                    return LBTrafficWorker(t.project, t.cluster_id)
+                def factory(since: str, t=target) -> LBTrafficWorker:  # type: ignore[misc]
+                    return LBTrafficWorker(t.project, t.cluster_id, freshness=since)
 
                 display_label = f"Project: {target.project}  |  Cluster: {target.cluster_id}"
 
@@ -897,8 +885,8 @@ class MainWindow(QMainWindow):
                     )
                     return
 
-                def factory(t=target) -> AWSLBTrafficWorker:  # type: ignore[misc]
-                    return AWSLBTrafficWorker(t.cluster_id)
+                def factory(since: str, t=target) -> AWSLBTrafficWorker:  # type: ignore[misc]
+                    return AWSLBTrafficWorker(t.cluster_id, since=since)
 
                 display_label = f"Region: {target.region}  |  Cluster: {target.cluster_id}"
 

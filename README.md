@@ -41,7 +41,7 @@ python main.py
 | Tool | Purpose |
 |------|---------|
 | `gcloud` + `kubectl` | GCP GKE cluster access |
-| `aws` CLI v2 + `kubectl` | AWS EKS cluster access |
+| `aws` + `kubectl` | AWS EKS cluster access |
 | `go` | Flame graphs in pod/cluster profiling |
 
 Install these via your system package manager (Homebrew on macOS) and ensure they are on your PATH.

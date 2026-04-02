@@ -277,7 +277,7 @@ class LBTrafficView(QWidget, WorkerMixin):
         self._search_bar = QLineEdit()
         self._search_bar.setObjectName("infraSearchBar")
         self._search_bar.setPlaceholderText("Filter by IP, status, path, method, user agent …")
-        self._search_bar.setMinimumWidth(280)
+        self._search_bar.setMinimumWidth(80)
         self._search_bar.textChanged.connect(self._apply_filter)
         row.addWidget(self._search_bar)
 
@@ -310,7 +310,7 @@ class LBTrafficView(QWidget, WorkerMixin):
             "Separate multiple terms with commas."
         )
         self._excl_bar.textChanged.connect(self._apply_filter)
-        self._excl_bar.setMinimumWidth(170)
+        self._excl_bar.setMinimumWidth(80)
         row.addWidget(self._excl_bar)
 
         row.addStretch()

@@ -212,6 +212,7 @@ class DashboardView(QWidget):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
 
         content = QWidget()
+        content.setObjectName("dashboardContent")
         self._root = QVBoxLayout(content)
         self._root.setContentsMargins(28, 24, 28, 28)
         self._root.setSpacing(0)

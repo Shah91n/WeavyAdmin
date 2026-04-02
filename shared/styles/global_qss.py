@@ -939,6 +939,10 @@ QScrollArea#dashboardScroll {{
     border: none;
 }}
 
+QWidget#dashboardContent {{
+    background-color: {COLOR_PRIMARY_BG};
+}}
+
 QLabel#dashboardSectionHeader {{
     font-size: 13px;
     font-weight: 700;

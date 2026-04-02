@@ -221,7 +221,7 @@ class LogView(QWidget, WorkerMixin):
         self._search_bar.setObjectName("infraSearchBar")
         self._search_bar.setPlaceholderText("Search message …")
         self._search_bar.textChanged.connect(self._apply_filter)
-        self._search_bar.setMinimumWidth(200)
+        self._search_bar.setMinimumWidth(80)
         row.addWidget(self._search_bar)
 
         # Separator label
@@ -254,7 +254,7 @@ class LogView(QWidget, WorkerMixin):
             "Separate multiple terms with commas."
         )
         self._excl_bar.textChanged.connect(self._apply_filter)
-        self._excl_bar.setMinimumWidth(180)
+        self._excl_bar.setMinimumWidth(80)
         row.addWidget(self._excl_bar)
 
         row.addStretch()

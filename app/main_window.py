@@ -234,6 +234,8 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 4)
         splitter.setSizes([200, 800])
+        splitter.setCollapsible(0, False)
+        self.sidebar.setMinimumWidth(160)
 
         container = QWidget()
         layout = QVBoxLayout(container)

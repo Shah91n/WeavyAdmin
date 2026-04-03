@@ -4,9 +4,10 @@ A desktop admin console for Weaviate vector database clusters.
 
 [![Weaviate](https://img.shields.io/static/v1?label=for&message=Weaviate%20%E2%9D%A4&color=green&style=flat-square)](https://weaviate.io/)
 [![GitHub Repo stars](https://img.shields.io/github/stars/Shah91n/WeavyAdmin?style=social)](https://github.com/Shah91n/WeavyAdmin)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python&logoColor=white)](https://python.org)
 
 <p align="center">
-  <img width="400" height="200" alt="image" src="https://github.com/user-attachments/assets/6e7a1b18-5fb5-4f96-9404-d4d840c947e3" />
+  <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6e7a1b18-5fb5-4f96-9404-d4d840c947e3" />
   <img width="900" height="600" alt="image" src="https://github.com/user-attachments/assets/0694471f-1855-47a5-a0de-10d11c63ebc2" />
 </p>
 

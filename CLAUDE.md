@@ -23,6 +23,7 @@ app/
   main_window.py                 Mounts sidebar + workspace, connects router
   sidebar.py                     Navigation tree
   workspace.py                   Tab widget with unique-ID deduplication
+  search_launcher.py             Orchestrates Search Data flow — MT check → type picker → dedup → open tab
 
 features/                        One package per feature — view + worker, fully self-contained
   cluster/                       Cluster overview, backups, operations, raft
@@ -37,6 +38,7 @@ features/                        One package per feature — view + worker, full
   rbac/                          RBAC manager view + workers
   request_log/                   HTTP request log view
   schema/                        Schema worker
+  search/                        BM25, vector similarity, hybrid search views + workers
   shards/                        Shard indexing view, rebalancer view, worker
   infra/                         K8s / GCP / AWS views — grouped as a feature set
     bridge/                      Cloud auth worker (BridgeWorker, BridgeCoordinator)
@@ -54,10 +56,11 @@ core/                            Pure Python — ZERO Qt imports — testable in
   weaviate/                      Weaviate API operations — one package per domain
     cluster/                     Backups, health, meta, nodes, shard movement, statistics
     collections/                 Aggregation, batch, create, delete, update
-    multitenancy/                MT check, tenant activity, tenant lookup
+    multitenancy/                MT check, tenant activity, tenant lookup, tenant list
     objects/                     Delete, read, update
     rbac/                        RBAC manager, report
     schema/                      Diagnostics, schema, shards
+    search/                      BM25, vector similarity, hybrid search core functions
   infra/                         subprocess wrappers for kubectl / gcloud / aws
     gcp/                         GCP cluster bridge + LB traffic reader
     aws/                         AWS cluster bridge + LB traffic reader
@@ -82,6 +85,7 @@ dialogs/                         Shared QDialogs — not owned by any single fea
   profiling_pod_selector_dialog.py
   property_settings_dialog.py
   rbac_dialogs.py
+  search_type_dialog.py
   shard_replication_dialog.py
   tenant_selector.py
   update_dialog.py

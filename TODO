@@ -1,5 +1,9 @@
-[] Live Monitoring
-[] Automated Tests
-[] Code sign + notarize DMG
-[] One-click auto-update (extend existing update check in About dialog to download + replace)
-[] GitHub Actions pipeline (auto-build and attach DMG on tagged release)
+[] Add update-available indicator in main UI (highlight key feature when a new version exists)
+[] Add UI in STS to add/remove modules and environments
+[] Implement live monitoring dashboard
+[] Add automated test suite
+[] Implement one-click auto-update (extend About dialog check to download and replace app)
+[] Add GitHub Actions release pipeline (build app and attach DMG on tagged releases)
+[] Add image search capability
+[] Add multimedia search capability
+[] Code-sign and notarize DMG for macOS distribution

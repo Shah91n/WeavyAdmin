@@ -3,91 +3,92 @@ import logging
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
-    QHBoxLayout,
+    QDialogButtonBox,
     QLabel,
-    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
-    QPushButton,
     QVBoxLayout,
 )
 
-from features.multitenancy.tenant_lookup_worker import TenantLookupWorker
+from features.multitenancy.tenant_list_worker import TenantListWorker
 
 logger = logging.getLogger(__name__)
 
 
 class TenantSelectorDialog(QDialog):
-    """Dialog to select a tenant by name without loading all tenants."""
+    """Dialog that loads all tenants for a collection and lets the user pick one."""
 
-    def __init__(self, collection_name: str, parent=None):
+    def __init__(self, collection_name: str, parent=None) -> None:
         super().__init__(parent)
         self.collection_name = collection_name
-        self.selected_tenant_name = None
-        self.worker = None
+        self._worker: TenantListWorker | None = None
+        self.selected_tenant_name: str | None = None
         self._setup_ui()
+        self._load_tenants()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         self.setWindowTitle("Select Tenant")
         self.setModal(True)
-        self.resize(420, 160)
+        self.resize(420, 340)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
-        title = QLabel(f"Collection: {self.collection_name}")
+        title = QLabel(f"Collection: <b>{self.collection_name}</b>")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(title)
 
-        input_layout = QHBoxLayout()
-        self.tenant_input = QLineEdit()
-        self.tenant_input.setPlaceholderText("Enter tenant name")
-        self.tenant_input.returnPressed.connect(self._on_search)
-        input_layout.addWidget(self.tenant_input)
+        self._status_label = QLabel("Loading tenants…")
+        self._status_label.setObjectName("secondaryLabel")
+        layout.addWidget(self._status_label)
 
-        self.search_button = QPushButton("Search")
-        self.search_button.clicked.connect(self._on_search)
-        input_layout.addWidget(self.search_button)
-        layout.addLayout(input_layout)
+        self._list = QListWidget()
+        self._list.setAlternatingRowColors(True)
+        self._list.itemDoubleClicked.connect(self._on_double_click)
+        layout.addWidget(self._list)
 
-        self.status_label = QLabel("Type a tenant name and click Search")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.status_label)
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        self._buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
+        self._buttons.accepted.connect(self._on_ok)
+        self._buttons.rejected.connect(self.reject)
+        layout.addWidget(self._buttons)
 
-    def _set_controls_enabled(self, enabled: bool):
-        self.tenant_input.setEnabled(enabled)
-        self.search_button.setEnabled(enabled)
+    def _load_tenants(self) -> None:
+        self._worker = TenantListWorker(self.collection_name)
+        self._worker.finished.connect(self._on_loaded)
+        self._worker.error.connect(self._on_error)
+        self._worker.start()
 
-    def _on_search(self):
-        tenant_name = self.tenant_input.text().strip()
-        if not tenant_name:
-            self.status_label.setText("Please enter a tenant name")
+    def _on_loaded(self, names: list) -> None:
+        self._worker = None
+        self._list.clear()
+        if not names:
+            self._status_label.setText("No tenants found.")
             return
+        self._status_label.setText(f"{len(names)} tenant(s) — select one and click OK")
+        for name in names:
+            self._list.addItem(QListWidgetItem(name))
+        self._list.setCurrentRow(0)
+        self._buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
 
-        if self.worker and self.worker.isRunning():
+    def _on_error(self, message: str) -> None:
+        self._worker = None
+        self._status_label.setText("Failed to load tenants.")
+        QMessageBox.warning(self, "Tenant Load Error", message)
+
+    def _on_ok(self) -> None:
+        item = self._list.currentItem()
+        if item is None:
             return
+        self.selected_tenant_name = item.text()
+        self.accept()
 
-        self.status_label.setText("Checking tenant...")
-        self._set_controls_enabled(False)
+    def _on_double_click(self, item: QListWidgetItem) -> None:
+        self.selected_tenant_name = item.text()
+        self.accept()
 
-        self.worker = TenantLookupWorker(self.collection_name, tenant_name)
-        self.worker.finished.connect(self._on_lookup_finished)
-        self.worker.error.connect(self._on_lookup_error)
-        self.worker.start()
-
-    def _on_lookup_finished(self, exists: bool, tenant_name: str):
-        self._set_controls_enabled(True)
-
-        if exists:
-            self.selected_tenant_name = tenant_name
-            self.accept()
-            return
-
-        self.status_label.setText("Tenant not found. Try another name.")
-
-    def _on_lookup_error(self, error_message: str):
-        self._set_controls_enabled(True)
-        self.status_label.setText("Lookup failed. Check the connection.")
-        QMessageBox.warning(self, "Tenant Lookup Error", error_message)
-
-    def get_tenant_name(self):
+    def get_tenant_name(self) -> str | None:
         return self.selected_tenant_name

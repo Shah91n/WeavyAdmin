@@ -2231,6 +2231,88 @@ QPushButton#dangerButton:disabled {{
 # Import and apply only GLOBAL_STYLESHEET — never the private _QSS_* pieces.
 # ---------------------------------------------------------------------------
 
+_QSS_SEARCH = f"""
+/* "+ Add condition" button inside the filter builder */
+QPushButton#addFilterConditionBtn {{
+    background-color: transparent;
+    color: {COLOR_ACCENT_GREEN};
+    border: 1px solid {COLOR_ACCENT_GREEN_DIM};
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 12px;
+}}
+QPushButton#addFilterConditionBtn:hover {{
+    background-color: {COLOR_HOVER};
+    border-color: {COLOR_ACCENT_GREEN};
+}}
+
+/* Search view property/vector list widgets */
+QListWidget#searchPropertyList {{
+    background-color: {COLOR_SECONDARY_BG};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 4px;
+}}
+QListWidget#searchPropertyList::item:selected {{
+    background-color: {COLOR_ACCENT_GREEN_DIM};
+    color: {COLOR_ACCENT_GREEN};
+}}
+
+/* Search type picker cards */
+QPushButton#searchTypeCard {{
+    background-color: {COLOR_SECONDARY_BG};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 8px;
+    color: {COLOR_TEXT_PRIMARY};
+    text-align: center;
+    padding: 8px;
+}}
+QPushButton#searchTypeCard:hover {{
+    background-color: {COLOR_HOVER};
+    border-color: {COLOR_ACCENT_GREEN};
+}}
+QPushButton#searchTypeCard:pressed {{
+    border-color: {COLOR_ACCENT_GREEN};
+    background-color: {COLOR_ACCENT_GREEN_DIM};
+}}
+
+QLabel#searchCardIcon {{
+    font-size: 28px;
+    background: transparent;
+}}
+QLabel#searchCardTitle {{
+    font-size: 13px;
+    font-weight: 600;
+    color: {COLOR_TEXT_PRIMARY};
+    background: transparent;
+}}
+QLabel#searchCardDesc {{
+    font-size: 11px;
+    color: {COLOR_TEXT_SECONDARY};
+    background: transparent;
+}}
+
+/* Primary action button used by search views */
+QPushButton#primaryButton {{
+    background-color: {COLOR_ACCENT_GREEN};
+    color: #000000;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 18px;
+    font-weight: 600;
+    font-size: 13px;
+}}
+QPushButton#primaryButton:hover {{
+    background-color: {COLOR_ACCENT_GREEN_HOVER};
+}}
+QPushButton#primaryButton:pressed {{
+    background-color: {COLOR_ACCENT_GREEN_PRESSED};
+}}
+QPushButton#primaryButton:disabled {{
+    background-color: {COLOR_DISABLED_TEXT};
+    color: {COLOR_SECONDARY_BG};
+}}
+"""
+
 GLOBAL_STYLESHEET = (
     _QSS_BASE
     + _QSS_SPLITTER
@@ -2260,4 +2342,5 @@ GLOBAL_STYLESHEET = (
     + _QSS_CREATE_COLLECTION
     + _QSS_BACKUPS
     + _QSS_SHARD_REBALANCER
+    + _QSS_SEARCH
 )

@@ -212,15 +212,6 @@ class Sidebar(QWidget):
             if section == "Logs":
                 self._rbac_log_item = section_item
 
-        # Cluster-wide system tools
-        for label, icon in [("RAFT", "⛵"), ("Backups", "💾"), ("Query Agent", "🤖")]:
-            item = QTreeWidgetItem(self.cluster_tree, [f"{icon}  {label}"])
-            item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": label})
-
-        # Aggregation — standalone at the bottom
-        aggregation_item = QTreeWidgetItem(self.cluster_tree, ["📊  Aggregation"])
-        aggregation_item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": "Aggregation"})
-
         # Multi Tenancy — greyed out until MT collections are confirmed to exist
         self._mt_available = False
         self._multitenancy_item = QTreeWidgetItem(self.cluster_tree, ["👥  Multi Tenancy"])
@@ -254,6 +245,19 @@ class Sidebar(QWidget):
         _mt_muted = QBrush(QColor("#6b7280"))
         for _it in (self._multitenancy_item, self._mt_report_item, self._mt_tenant_activity_item):
             _it.setForeground(0, _mt_muted)
+
+        # Cluster-wide system tools
+        for label, icon in [("RAFT", "⛵"), ("Backups", "💾")]:
+            item = QTreeWidgetItem(self.cluster_tree, [f"{icon}  {label}"])
+            item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": label})
+
+        # Aggregation
+        aggregation_item = QTreeWidgetItem(self.cluster_tree, ["📊  Aggregation"])
+        aggregation_item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": "Aggregation"})
+
+        # Query Agent — last in the list
+        query_agent_item = QTreeWidgetItem(self.cluster_tree, ["🤖  Query Agent"])
+        query_agent_item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": "Query Agent"})
 
         self.cluster_tree.itemClicked.connect(self._on_tool_clicked)
         cluster_layout.addWidget(self.cluster_tree)
@@ -639,9 +643,13 @@ class Sidebar(QWidget):
             vector_name = item_data.get("vector_name")
 
         if is_collection and collection_name:
+            search_action = menu.addAction("🔍 Search Data")
             read_action = menu.addAction("📖 Read Data")
             delete_action = menu.addAction("🗑️ Delete Collection")
 
+            search_action.triggered.connect(
+                lambda: self.collection_action_requested.emit(collection_name, "search")
+            )
             read_action.triggered.connect(
                 lambda: self.collection_action_requested.emit(collection_name, "read")
             )

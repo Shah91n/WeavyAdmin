@@ -56,6 +56,7 @@ Install these via your system package manager (Homebrew on macOS) and ensure the
 - **Shard Rebalancer** — COPY/MOVE replica operations, compute and apply a balance plan, monitor replication operations (requires `REPLICA_MOVEMENT_ENABLED=true`)
 - **Collection Management** — create (Custom Schema or CSV), aggregate, delete
 - **Schema Diagnostics** — cluster health checks, shard consistency, compression and replication analysis
+- **Search Data** — right-click any collection → choose BM25 keyword, Vector Similarity (near_text / near_vector), or Hybrid search; supports filters, metadata return, named vectors, and multi-tenancy
 - **RBAC Manager** — create/edit/delete roles, manage DB users and OIDC groups, assign/revoke roles
 - **RBAC Report & Logs** — aggregated insights and authorization audit log viewer
 - **Query Agent** — natural-language chat interface using the Weaviate Query Agent (Weaviate Cloud only)
@@ -74,11 +75,12 @@ Install these via your system package manager (Homebrew on macOS) and ensure the
 ```
 main.py              QApplication setup only
 app/
-  state.py           AppState — shared signals (connection_changed, namespace_changed)
-  router.py          Maps (section, tool_name) → view class
-  main_window.py     Mounts sidebar + workspace, connects router
-  sidebar.py         Navigation tree
-  workspace.py       Tab widget with unique-ID deduplication
+  state.py             AppState — shared signals (connection_changed, namespace_changed)
+  router.py            Maps (section, tool_name) → view class
+  main_window.py       Mounts sidebar + workspace, connects router
+  sidebar.py           Navigation tree
+  workspace.py         Tab widget with unique-ID deduplication
+  search_launcher.py   Orchestrates Search Data flow (MT check → type picker → tab open)
 features/            One package per feature — view + worker, fully self-contained
   cluster/           Cluster info, backups, operations, raft
   collections/       Create, query, aggregate, update config
@@ -92,6 +94,7 @@ features/            One package per feature — view + worker, fully self-conta
   rbac/              RBAC manager
   request_log/       Live HTTP/gRPC request log viewer
   schema/            Schema loader
+  search/            BM25, vector similarity, hybrid search views + workers
   shards/            Shard indexing + rebalancer
   infra/             K8s/GCP/AWS views
     bridge/          Cloud auth worker
@@ -107,7 +110,8 @@ core/
   weaviate/          Pure Python Weaviate API wrappers (zero Qt)
     cluster/         Backups, health, meta, nodes, shard movement, statistics
     collections/     Aggregation, batch, create, delete, update
-    multitenancy/    MT check, tenant activity, tenant lookup
+    multitenancy/    MT check, tenant activity, tenant lookup, tenant list
+    search/          BM25, vector similarity, hybrid search core functions
     objects/         Delete, read, update
     rbac/            RBAC manager, report
     schema/          Diagnostics, schema, shards

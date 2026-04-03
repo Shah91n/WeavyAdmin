@@ -6,20 +6,4 @@
 
 ---
 
-## Current Plan
-_No active plan._
-
----
-
-## Template
-```
-## Goal
-One-line description.
-
-## Steps
-- [ ] Step 1
-- [ ] Step 2
-
-## Notes
-_Decisions and gotchas._
-```
+_No active plans._

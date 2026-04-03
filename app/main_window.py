@@ -1129,6 +1129,12 @@ class MainWindow(QMainWindow):
 
         if action_type == "read":
             self._open_collection_read_flow(collection_name)
+            return
+
+        if action_type == "search":
+            from app.search_launcher import launch_search
+
+            launch_search(collection_name, self.workspace, get_collection_schema, self)
 
     def _confirm_and_delete_collection(self, collection_name: str) -> None:
         result = QMessageBox.question(

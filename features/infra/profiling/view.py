@@ -19,7 +19,6 @@ import contextlib
 import logging
 import os
 import subprocess
-import sys
 import time
 
 from PyQt6.QtCore import QSettings, Qt, pyqtSignal
@@ -846,21 +845,11 @@ def _open_file(path: str) -> None:
     """Open *path* directly with the system default application."""
     if not path or not os.path.exists(path):
         return
-    if sys.platform == "darwin":
-        subprocess.Popen(["open", path])
-    elif sys.platform == "win32":
-        subprocess.Popen(["start", "", path], shell=True)
-    else:
-        subprocess.Popen(["xdg-open", path])
+    subprocess.Popen(["open", path])
 
 
 def _open_in_finder(path: str) -> None:
     """Open the *folder* at *path* in Finder / Explorer / file manager."""
     if not path or not os.path.exists(path):
         return
-    if sys.platform == "darwin":
-        subprocess.Popen(["open", path])
-    elif sys.platform == "win32":
-        subprocess.Popen(["explorer", path])
-    else:
-        subprocess.Popen(["xdg-open", path])
+    subprocess.Popen(["open", path])

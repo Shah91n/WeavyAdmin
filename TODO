@@ -1,2 +1,5 @@
 [] Live Monitoring
 [] Automated Tests
+[] Code sign + notarize DMG
+[] One-click auto-update (extend existing update check in About dialog to download + replace)
+[] GitHub Actions pipeline (auto-build and attach DMG on tagged release)

@@ -40,7 +40,6 @@ update in real-time.  The view keeps running when the user switches tabs.
 import logging
 import os
 import subprocess
-import sys
 
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtGui import QFont, QTextCursor
@@ -357,12 +356,7 @@ class ClusterProfilingView(QWidget, WorkerMixin):
     def _open_final_dir(self) -> None:
         if not self._final_dir or not os.path.exists(self._final_dir):
             return
-        if sys.platform == "darwin":
-            subprocess.Popen(["open", self._final_dir])
-        elif sys.platform == "win32":
-            subprocess.Popen(["explorer", self._final_dir])
-        else:
-            subprocess.Popen(["xdg-open", self._final_dir])
+        subprocess.Popen(["open", self._final_dir])
 
 
 # ---------------------------------------------------------------------------

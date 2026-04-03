@@ -31,7 +31,7 @@ This is a one-time step per machine.
 git clone https://github.com/Shah91n/WeavyAdmin.git
 cd WeavyAdmin
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```

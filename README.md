@@ -13,7 +13,7 @@ A desktop admin console for Weaviate vector database clusters.
 
 ## Installation (macOS DMG)
 
-Download `WeavyAdmin-1.0.0.dmg` from the [Releases](https://github.com/Shah91n/WeavyAdmin/releases) page, open it, and drag **WeavyAdmin** to Applications.
+Download `WeavyAdmin-X.X.X.dmg` from the [Releases](https://github.com/Shah91n/WeavyAdmin/releases) page, open it, and drag **WeavyAdmin** to Applications.
 
 **First launch:** macOS will block the app with a security warning because it is not notarized. To open it:
 

@@ -54,7 +54,8 @@ Install these via your system package manager (Homebrew on macOS) and ensure the
 - **Shards Details** — all shards with search and filter
 - **Shards Indexing Status** — view every shard replica, bulk set READONLY → READY, multi-select actions
 - **Shard Rebalancer** — COPY/MOVE replica operations, compute and apply a balance plan, monitor replication operations (requires `REPLICA_MOVEMENT_ENABLED=true`)
-- **Collection Management** — create (Custom Schema or CSV), aggregate, delete
+- **Collection Management** — create (Custom Schema or CSV), delete
+- **Aggregation Report** — per-collection / per-tenant counts with CSV export and a single-collection (or single-tenant) on-demand counter
 - **Schema Diagnostics** — cluster health checks, shard consistency, compression and replication analysis
 - **Search Data** — right-click any collection → choose BM25 keyword, Vector Similarity (near_text / near_vector), or Hybrid search; supports filters, metadata return, named vectors, and multi-tenancy
 - **RBAC Manager** — create/edit/delete roles, manage DB users and OIDC groups, assign/revoke roles
@@ -82,8 +83,8 @@ app/
   workspace.py         Tab widget with unique-ID deduplication
   search_launcher.py   Orchestrates Search Data flow (MT check → type picker → tab open)
 features/            One package per feature — view + worker, fully self-contained
-  cluster/           Cluster info, backups, operations, raft
-  collections/       Create, query, aggregate, update config
+  cluster/           Cluster info, backups, operations, raft, aggregation report
+  collections/       Create, update config
   config/            Collection configuration viewer
   dashboard/         Cluster health overview
   diagnose/          Schema diagnostics

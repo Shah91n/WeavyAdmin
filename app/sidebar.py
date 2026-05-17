@@ -251,9 +251,9 @@ class Sidebar(QWidget):
             item = QTreeWidgetItem(self.cluster_tree, [f"{icon}  {label}"])
             item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": label})
 
-        # Aggregation
-        aggregation_item = QTreeWidgetItem(self.cluster_tree, ["📊  Aggregation"])
-        aggregation_item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": "Aggregation"})
+        # Aggregation Report
+        aggregation_item = QTreeWidgetItem(self.cluster_tree, ["📊  Aggregation Report"])
+        aggregation_item.setData(0, Qt.ItemDataRole.UserRole, {"tool_type": "Aggregation Report"})
 
         # Query Agent — last in the list
         query_agent_item = QTreeWidgetItem(self.cluster_tree, ["🤖  Query Agent"])

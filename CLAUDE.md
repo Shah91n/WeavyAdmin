@@ -26,8 +26,8 @@ app/
   search_launcher.py             Orchestrates Search Data flow — MT check → type picker → dedup → open tab
 
 features/                        One package per feature — view + worker, fully self-contained
-  cluster/                       Cluster overview, backups, operations, raft
-  collections/                   Collection create, update config, aggregation
+  cluster/                       Cluster overview, backups, operations, raft, aggregation report
+  collections/                   Collection create, update config
   config/                        Collection configuration view + worker
   dashboard/                     Dashboard view + worker
   diagnose/                      Diagnostics view + worker
@@ -96,11 +96,15 @@ dialogs/                         Shared QDialogs — not owned by any single fea
 ## Rules (non-negotiable)
 
 ### Structure
-- `core/` has zero Qt imports — pure business logic and CLI wrappers only.
+- `core/` has zero Qt imports — pure business logic and CLI wrappers only. All Weaviate / `gcloud` / `kubectl` / `aws` calls live here.
 - Each feature lives entirely inside its `features/<name>/` package.
+- **Strict three-layer split** (non-negotiable, applies to every feature):
+  - **UI lives in a view file** (`view.py` or `<name>_view.py`). Qt widgets, layouts, signal wiring, QSS object names. Never makes blocking network/CLI calls.
+  - **Background work lives in a worker file** (`worker.py` or `<name>_worker.py`). One `QThread` subclass per logical operation. The worker is the *only* place a view-driven `core/` call is invoked.
+  - **Data / business logic lives in `core/`**. Pure Python, returns plain dicts/lists. No Qt, no threading, no UI concerns.
+  - View imports worker. Worker imports `core/`. `core/` imports nothing from `features/`. No layer skips.
 - `features/` files must not import each other — use `shared/` or `core/` for cross-cutting concerns.
 - Dialogs live in `dialogs/` — never inside a feature or sidebar file.
-- CLI calls (`gcloud`, `kubectl`, `aws`) go in `core/infra/` using `subprocess.run` — no SDK wrappers.
 
 ### AppState
 - Views subscribe to `AppState` signals directly — no weakref lists, no manual push loops in `main_window`.
@@ -111,7 +115,9 @@ dialogs/                         Shared QDialogs — not owned by any single fea
 - Tab deduplication check always happens in the router before constructing a view.
 
 ### Workers
-- Every worker inherits `shared/base_worker.py` — already has `finished`, `error`, `progress`.
+- Every worker lives in its own file (`worker.py` or `<name>_worker.py`) — never inline inside a view.
+- Every worker inherits `shared/base_worker.py` — already has `error`, `progress`, and `cancel()`.
+- A worker that needs a typed `finished` payload defines its own `finished = pyqtSignal(<type>)` (PyQt6 can't override signal payloads via inheritance).
 - Store workers as `self._worker` — never as a local variable.
 - First line of every `finished`/`error` handler: `self._detach_worker()`.
 - Never call `QThread.wait()` on the UI thread.
@@ -124,6 +130,13 @@ dialogs/                         Shared QDialogs — not owned by any single fea
 - `INFRA_STYLESHEET` applied once to the root widget of infra views.
 - No `setStyleSheet()` on individual child widgets — use `setObjectName()` + QSS selectors.
 - Dynamic states (success/warning/error) → switch `setObjectName()`, not inline styles.
+- Text content the user might want to copy (summary stats, IDs, error messages) → use `Qt.TextInteractionFlag.TextSelectableByMouse` on the `QLabel`.
+
+### UI consistency
+- Sibling views inside the same feature share their layout primitives — summary panels, headers, banners, empty-state labels — via a **feature-local** base class in the same view file (e.g. `ClusterOperationViewSpecialBase` in `features/cluster/operation_special.py`). This applies to **UI helpers only** — it does not override the view/worker split: workers always live in their own file.
+- Don't promote UI helpers to `shared/` until at least two features genuinely need them.
+- Deviate from the shared primitives only when the underlying data shape genuinely demands it (e.g. a view with no summary, or one that needs a fundamentally different table). When deviating, leave a one-line comment explaining why.
+- When polishing one view in a sibling group, propagate the change to the others in the same commit.
 
 ### Naming
 - Every feature uses the same name across: file, class, sidebar label, tab ID, tab label, QSS object name, signal names. Rename all atomically.

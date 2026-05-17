@@ -7,3 +7,15 @@
 [] Add image search capability
 [] Add multimedia search capability
 [] Code-sign and notarize DMG for macOS distribution
+[] Refactor UX/UI in different Views for ease
+[] More work with STS (Scaling / STS Updates)
+[] Add at the top bar, the timeout settings connected with
+[] Add loading bar for LB or Logs to show progress when fetching
+[] Delete all or Multi-Select Collections
+[] Add fix for Schema where consistency is missing
+[] Add Search Capability in Diagnositcis report
+[] DeDup GoRoutines in the Profiling
+[] Print out data report of any table/list of data output 
+[] Pod Logs filtering
+[] Fix Bug in ingest It always say Fail despite success also print values as it ingest on the way
+[] Total Objects in main dashboard in background loaded in general in MT/Non MT

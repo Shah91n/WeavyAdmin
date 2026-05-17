@@ -1,164 +1,75 @@
-"""Special views for Operations (Aggregation, Multi Tenancy, Tenant Activity)."""
+"""Special views for Operations (Multi Tenancy, Tenant Activity).
 
-import logging
+The Aggregation Report is a standalone view in ``aggregation_view.py``.
+"""
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
+    QGridLayout,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
-    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-logger = logging.getLogger(__name__)
-
 
 class ClusterOperationViewSpecialBase(QWidget):
     """Base view with shared helpers for special cluster Operations views."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
 
-    def _clear_layout(self):
+    def _clear_layout(self) -> None:
         while self.layout.count():
             self.layout.takeAt(0).widget().deleteLater()
 
-    def _toggle_summary_visibility(self, checked):
-        self.summary_content.setVisible(checked)
-        if checked:
-            self.summary_toggle_button.setText("▼ Summary Statistics")
-        else:
-            self.summary_toggle_button.setText("▶ Summary Statistics")
+    def _render_summary(self, stats: list[tuple[str, str]]) -> None:
+        """Append a compact key/value summary frame to the view layout.
 
+        *stats* is a list of (label, value) string pairs. Both columns are
+        rendered as selectable QLabels so the user can drag-select to copy.
+        """
+        frame = QFrame()
+        frame.setObjectName("summaryFrame")
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(12, 10, 12, 10)
+        frame_layout.setSpacing(8)
 
-class ClusterAggregationViewSpecial(ClusterOperationViewSpecialBase):
-    """Render aggregation data with summary stats and table."""
+        header = QLabel("Summary")
+        header.setObjectName("summaryHeader")
+        frame_layout.addWidget(header)
 
-    def render_data(self, data):
-        self._clear_layout()
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(24)
+        grid.setVerticalSpacing(4)
+        grid.setContentsMargins(0, 0, 0, 0)
+        for row_idx, (label_text, value_text) in enumerate(stats):
+            label = QLabel(label_text)
+            label.setObjectName("summaryLabel")
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
-        if isinstance(data, dict) and "error" in data:
-            error_text = data["error"]
-            if "timeout" in error_text.lower() or "timed out" in error_text.lower():
-                error_message = (
-                    f"Error: {error_text}\n\n"
-                    "This operation timed out. For large databases, consider increasing "
-                    "the client timeout settings in your connection configuration."
-                )
-            else:
-                error_message = f"Error: {error_text}"
+            value = QLabel(value_text)
+            value.setObjectName("summaryValue")
+            value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-            error_label = QLabel(error_message)
-            error_label.setObjectName("errorLabel")
-            error_label.setWordWrap(True)
-            self.layout.addWidget(error_label)
-            return
+            grid.addWidget(label, row_idx, 0)
+            grid.addWidget(value, row_idx, 1)
 
-        summary_frame = QFrame()
-        summary_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        summary_layout = QVBoxLayout(summary_frame)
+        wrap = QHBoxLayout()
+        wrap.setContentsMargins(0, 0, 0, 0)
+        wrap.addLayout(grid)
+        wrap.addStretch()
+        frame_layout.addLayout(wrap)
 
-        self.summary_toggle_button = QPushButton("▼ Summary Statistics")
-        self.summary_toggle_button.setObjectName("summaryToggle")
-        self.summary_toggle_button.setCheckable(True)
-        self.summary_toggle_button.setChecked(True)
-
-        self.summary_content = QWidget()
-        summary_content_layout = QVBoxLayout(self.summary_content)
-        summary_content_layout.setContentsMargins(10, 10, 10, 10)
-
-        collection_count = data.get("collection_count", 0)
-        total_tenants_count = data.get("total_tenants_count", 0)
-        empty_collections = data.get("empty_collections", 0)
-        empty_tenants = data.get("empty_tenants", 0)
-        total_objects_regular = data.get("total_objects_regular", 0)
-        total_objects_multitenancy = data.get("total_objects_multitenancy", 0)
-        total_objects_combined = data.get("total_objects_combined", 0)
-
-        summary_text = (
-            "<div style=\"font-family: 'Courier New';\">"
-            f"<b>Total Objects:</b> {total_objects_combined:,}<br>"
-            f"<b>Collections:</b> {collection_count}<br>"
-            f"<b>Empty Collections:</b> {empty_collections}<br>"
-            f"<b>Total Tenants:</b> {total_tenants_count}<br>"
-            f"<b>Empty Tenants:</b> {empty_tenants}<br>"
-            "<br>"
-            f"<b>Objects (Regular):</b> {total_objects_regular:,}<br>"
-            f"<b>Objects (Multi-tenancy):</b> {total_objects_multitenancy:,}"
-            "</div>"
-        )
-        summary_label = QLabel(summary_text)
-        summary_label.setTextFormat(Qt.TextFormat.RichText)
-        summary_label.setWordWrap(True)
-        summary_content_layout.addWidget(summary_label)
-
-        self.summary_toggle_button.toggled.connect(
-            lambda checked: self._toggle_summary_visibility(checked)
-        )
-
-        summary_layout.addWidget(self.summary_toggle_button)
-        summary_layout.addWidget(self.summary_content)
-
-        self.layout.addWidget(summary_frame)
-
-        rows = data.get("rows", [])
-        if not rows:
-            no_data_label = QLabel("No collections found to aggregate.")
-            no_data_label.setObjectName("noDataLabel")
-            no_data_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout.addWidget(no_data_label)
-            return
-
-        table = QTableWidget()
-        table.setColumnCount(3)
-        table.setHorizontalHeaderLabels(["Collection", "Tenant", "Object Count"])
-        table.setRowCount(len(rows))
-
-        for row_idx, row in enumerate(rows):
-            row_type = row.get("type", "")
-            collection_name = row.get("collection", "")
-            count = row.get("count", "")
-            tenant_name = row.get("tenant", "")
-            tenant_count = row.get("tenant_count", "")
-
-            collection_item = QTableWidgetItem(str(collection_name) if collection_name else "")
-            collection_item.setFlags(collection_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            table.setItem(row_idx, 0, collection_item)
-
-            tenant_item = QTableWidgetItem(str(tenant_name) if tenant_name else "")
-            tenant_item.setFlags(tenant_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            table.setItem(row_idx, 1, tenant_item)
-
-            if row_type == "collection" and count is not None:
-                count_text = str(count)
-            elif row_type == "tenant" and tenant_count is not None:
-                count_text = str(tenant_count)
-            else:
-                count_text = ""
-
-            count_item = QTableWidgetItem(count_text)
-            count_item.setFlags(count_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-
-            if isinstance(count, str) and "ERROR" in count:
-                count_item.setForeground(Qt.GlobalColor.red)
-            if isinstance(tenant_count, str) and "ERROR" in str(tenant_count):
-                count_item.setForeground(Qt.GlobalColor.red)
-
-            table.setItem(row_idx, 2, count_item)
-
-        table.setSortingEnabled(True)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-
-        self.layout.addWidget(table)
+        self.layout.addWidget(frame)
 
 
 class ClusterMultiTenancyViewSpecial(ClusterOperationViewSpecialBase):
@@ -182,41 +93,12 @@ class ClusterMultiTenancyViewSpecial(ClusterOperationViewSpecialBase):
         warning_label.setWordWrap(True)
         self.layout.addWidget(warning_label)
 
-        summary_frame = QFrame()
-        summary_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        summary_layout = QVBoxLayout(summary_frame)
-
-        self.summary_toggle_button = QPushButton("▼ Summary Statistics")
-        self.summary_toggle_button.setObjectName("summaryToggle")
-        self.summary_toggle_button.setCheckable(True)
-        self.summary_toggle_button.setChecked(True)
-
-        self.summary_content = QWidget()
-        summary_content_layout = QVBoxLayout(self.summary_content)
-        summary_content_layout.setContentsMargins(10, 10, 10, 10)
-
-        collection_count = data.get("collection_count", 0)
-        total_tenants = data.get("total_tenants", 0)
-
-        summary_text = (
-            "<div style=\"font-family: 'Courier New';\">"
-            f"<b>Multi-tenant Collections:</b> {collection_count}<br>"
-            f"<b>Total Tenants:</b> {total_tenants}"
-            "</div>"
+        self._render_summary(
+            [
+                ("Multi-tenant Collections", f"{data.get('collection_count', 0):,}"),
+                ("Total Tenants", f"{data.get('total_tenants', 0):,}"),
+            ]
         )
-        summary_label = QLabel(summary_text)
-        summary_label.setTextFormat(Qt.TextFormat.RichText)
-        summary_label.setWordWrap(True)
-        summary_content_layout.addWidget(summary_label)
-
-        self.summary_toggle_button.toggled.connect(
-            lambda checked: self._toggle_summary_visibility(checked)
-        )
-
-        summary_layout.addWidget(self.summary_toggle_button)
-        summary_layout.addWidget(self.summary_content)
-
-        self.layout.addWidget(summary_frame)
 
         rows = data.get("rows", [])
         if not rows:
@@ -298,41 +180,12 @@ class ClusterTenantActivityViewSpecial(ClusterOperationViewSpecialBase):
             warning_label.setWordWrap(True)
             self.layout.addWidget(warning_label)
 
-        summary_frame = QFrame()
-        summary_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        summary_layout = QVBoxLayout(summary_frame)
-
-        self.summary_toggle_button = QPushButton("▼ Summary Statistics")
-        self.summary_toggle_button.setObjectName("summaryToggle")
-        self.summary_toggle_button.setCheckable(True)
-        self.summary_toggle_button.setChecked(True)
-
-        self.summary_content = QWidget()
-        summary_content_layout = QVBoxLayout(self.summary_content)
-        summary_content_layout.setContentsMargins(10, 10, 10, 10)
-
-        collection_count = data.get("collection_count", 0)
-        tenant_count = data.get("tenant_count", 0)
-
-        summary_text = (
-            "<div style=\"font-family: 'Courier New';\">"
-            f"<b>Multi-tenant Collections:</b> {collection_count}<br>"
-            f"<b>Total Tenants:</b> {tenant_count}"
-            "</div>"
+        self._render_summary(
+            [
+                ("Multi-tenant Collections", f"{data.get('collection_count', 0):,}"),
+                ("Total Tenants", f"{data.get('tenant_count', 0):,}"),
+            ]
         )
-        summary_label = QLabel(summary_text)
-        summary_label.setTextFormat(Qt.TextFormat.RichText)
-        summary_label.setWordWrap(True)
-        summary_content_layout.addWidget(summary_label)
-
-        self.summary_toggle_button.toggled.connect(
-            lambda checked: self._toggle_summary_visibility(checked)
-        )
-
-        summary_layout.addWidget(self.summary_toggle_button)
-        summary_layout.addWidget(self.summary_content)
-
-        self.layout.addWidget(summary_frame)
 
         rows = data.get("rows", [])
         if not rows:

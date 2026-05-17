@@ -3,6 +3,7 @@ from core.weaviate.multitenancy.check import (
     has_multitenancy_collections,
 )
 from core.weaviate.multitenancy.tenant_activity import get_tenants_activity_status
+from core.weaviate.multitenancy.tenant_list import list_tenants
 from core.weaviate.multitenancy.tenant_lookup import check_tenant_exists
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "check_tenant_exists",
     "get_tenants_activity_status",
     "has_multitenancy_collections",
+    "list_tenants",
 ]

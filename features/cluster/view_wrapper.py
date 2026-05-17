@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidg
 from features.cluster.backup_special import ClusterBackupViewSpecial
 from features.cluster.fetch_worker import ClusterFetchWorker
 from features.cluster.operation_special import (
-    ClusterAggregationViewSpecial,
     ClusterMultiTenancyViewSpecial,
     ClusterTenantActivityViewSpecial,
 )
@@ -90,8 +89,6 @@ class ClusterViewWrapper(QWidget, WorkerMixin):
             self.data_widget = ClusterBackupViewSpecial()
         elif self.tool_type == "RAFT":
             self.data_widget = ClusterRaftViewSpecial()
-        elif self.tool_type == "Aggregation":
-            self.data_widget = ClusterAggregationViewSpecial()
         elif self.tool_type == "Multi Tenancy":
             self.data_widget = ClusterMultiTenancyViewSpecial()
         elif self.tool_type == "Tenant Activity":
@@ -117,15 +114,8 @@ class ClusterViewWrapper(QWidget, WorkerMixin):
 
     def _set_loading(self) -> None:
         self._refresh_btn.setEnabled(False)
-        if self.tool_type == "Aggregation":
-            self.status_label.setText(
-                "⏳  Loading… Aggregation can take a while on large databases. "
-                "If it times out, increase the client timeout in connection settings."
-            )
-            self.status_label.setObjectName("warningBanner")
-        else:
-            self.status_label.setText("Loading data...")
-            self.status_label.setObjectName("loadingLabel")
+        self.status_label.setText("Loading data...")
+        self.status_label.setObjectName("loadingLabel")
         self.status_label.setWordWrap(True)
         self.status_label.style().unpolish(self.status_label)
         self.status_label.style().polish(self.status_label)

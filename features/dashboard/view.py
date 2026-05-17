@@ -297,7 +297,7 @@ class DashboardView(QWidget):
         # Row 0 – core ops (no infra needed)
         core_actions = [
             ("➕", "Create Collection", False),
-            ("📊", "Aggregation", False),
+            ("📊", "Aggregation Report", False),
             ("🩺", "Diagnose", False),
             ("💾", "Backups", False),
             ("🔐", "RBAC Manager", False),
@@ -348,7 +348,7 @@ class DashboardView(QWidget):
     def _wire_action(self, btn: _QuickActionButton, label: str) -> None:
         _map: dict[str, str | None] = {
             "Create Collection": None,  # special case
-            "Aggregation": "Aggregation",
+            "Aggregation Report": "Aggregation Report",
             "Diagnose": "Diagnose",
             "Logs": "Logs",
             "RBAC Manager": "RBAC:Manager",

@@ -1364,6 +1364,45 @@ QPushButton#summaryToggle:hover {{
     background-color: {COLOR_BORDER};
 }}
 
+QFrame#summaryFrame, QFrame#aggPickerFrame {{
+    background-color: {COLOR_SECONDARY_BG};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 6px;
+}}
+
+QPlainTextEdit#aggSummaryBox {{
+    background-color: {COLOR_PRIMARY_BG};
+    color: {COLOR_TEXT_PRIMARY};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 4px;
+    padding: 8px;
+    font-family: "Menlo", "Consolas", monospace;
+    font-size: 12px;
+}}
+
+QLabel#aggPickerResult {{
+    color: {COLOR_TEXT_PRIMARY};
+    font-family: "Menlo", "Consolas", monospace;
+    padding: 4px 0;
+}}
+
+QLabel#summaryHeader {{
+    color: {COLOR_TEXT_PRIMARY};
+    font-weight: bold;
+    font-size: 13px;
+}}
+
+QLabel#summaryLabel {{
+    color: {COLOR_TEXT_SECONDARY};
+    font-weight: 500;
+}}
+
+QLabel#summaryValue {{
+    color: {COLOR_TEXT_PRIMARY};
+    font-family: "Menlo", "Consolas", monospace;
+    font-weight: 600;
+}}
+
 QPushButton#diagSetReadyButton {{
     background-color: {COLOR_ACCENT_GREEN};
     color: {COLOR_SECONDARY_BG};

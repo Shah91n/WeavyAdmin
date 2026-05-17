@@ -28,7 +28,7 @@ from core.connection.connection_manager import get_weaviate_manager
 from core.infra.aws.bridge import AWSK8sBridge
 from core.infra.gcp.bridge import GCPK8sBridge
 from core.weaviate.cluster import get_backups, get_cluster_statistics, get_meta, get_nodes
-from core.weaviate.collections import aggregate_collections, delete_collection
+from core.weaviate.collections import delete_collection
 from core.weaviate.multitenancy import (
     check_multi_tenancy_status,
     get_tenants_activity_status,
@@ -41,6 +41,7 @@ from dialogs.connection_dialog import ConnectionDialog
 from dialogs.create_collection_choice_dialog import CreateCollectionChoiceDialog
 from dialogs.profiling_pod_selector_dialog import ProfilingPodSelectorDialog
 from dialogs.tenant_selector import TenantSelectorDialog
+from features.cluster.aggregation_view import AggregationReportView
 from features.cluster.view_wrapper import ClusterViewWrapper
 from features.collections.create_view import CreateCollectionView
 from features.collections.update_config_view import UpdateCollectionConfigView
@@ -1086,16 +1087,15 @@ class MainWindow(QMainWindow):
             self.workspace.add_tab_with_id(cluster_view, tab_id, tab_label, worker=None)
             cluster_view.load_data()
 
-        # Handle Aggregation
-        elif tool_name == "Aggregation":
-            tab_id = "cluster:Aggregation"
-            tab_label = "📊 Aggregation"
+        # Handle Aggregation Report
+        elif tool_name == "Aggregation Report":
+            tab_id = "cluster:Aggregation Report"
+            tab_label = "📊 Aggregation Report"
             if tab_id in self.workspace.tab_id_to_index:
                 self.workspace.setCurrentIndex(self.workspace.tab_id_to_index[tab_id])
                 return
-            cluster_view = ClusterViewWrapper("Aggregation", fetch_fn=aggregate_collections)
-            self.workspace.add_tab_with_id(cluster_view, tab_id, tab_label, worker=None)
-            cluster_view.load_data()
+            view = AggregationReportView()
+            self.workspace.add_tab_with_id(view, tab_id, tab_label, worker=None)
 
         # Handle Multi Tenancy MT Report child
         elif tool_name == "Multi Tenancy:MT Report":

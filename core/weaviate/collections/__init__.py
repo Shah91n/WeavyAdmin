@@ -1,4 +1,9 @@
-from core.weaviate.collections.aggregation import aggregate_collections
+from core.weaviate.collections.aggregation import (
+    aggregate_collections,
+    aggregate_one_collection,
+    aggregate_one_tenant,
+    list_collections_with_mt_status,
+)
 from core.weaviate.collections.batch import (
     add_tenant_to_collection,
     batch_ingest_mt,
@@ -30,6 +35,8 @@ from core.weaviate.collections.update import (
 __all__ = [
     "add_tenant_to_collection",
     "aggregate_collections",
+    "aggregate_one_collection",
+    "aggregate_one_tenant",
     "batch_ingest_mt",
     "batch_ingest_standard",
     "build_header_map",
@@ -44,6 +51,7 @@ __all__ = [
     "get_quantizer_config",
     "get_supported_vectorizers",
     "get_vector_config",
+    "list_collections_with_mt_status",
     "map_row_to_properties",
     "parse_vector_value",
     "sanitize_property_name",

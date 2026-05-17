@@ -161,6 +161,45 @@ def aggregate_collections() -> dict:
         return {"error": str(e)}
 
 
+def list_collections_with_mt_status() -> list[dict]:
+    """Return all collections with their multi-tenancy flag.
+
+    Each item: ``{"name": str, "multi_tenant": bool}``. Sorted by name.
+    Raises on connection failure so the caller can surface the error.
+    """
+    manager = get_weaviate_manager()
+    client = manager.client
+    collections = client.collections.list_all(simple=False) or {}
+    result: list[dict] = []
+    for name, cfg in collections.items():
+        mt_cfg = getattr(cfg, "multi_tenancy_config", None)
+        result.append({"name": name, "multi_tenant": bool(getattr(mt_cfg, "enabled", False))})
+    result.sort(key=lambda item: item["name"].lower())
+    return result
+
+
+def aggregate_one_collection(collection_name: str) -> dict:
+    """Return ``{"count": int}`` for a single non-MT collection, or ``{"error": str}``."""
+    try:
+        manager = get_weaviate_manager()
+        collection = manager.client.collections.use(collection_name)
+        total = collection.aggregate.over_all(total_count=True).total_count
+        return {"count": int(total or 0)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def aggregate_one_tenant(collection_name: str, tenant_name: str) -> dict:
+    """Return ``{"count": int}`` for a single tenant of an MT collection, or ``{"error": str}``."""
+    try:
+        manager = get_weaviate_manager()
+        collection = manager.client.collections.use(collection_name).with_tenant(tenant_name)
+        total = collection.aggregate.over_all(total_count=True).total_count
+        return {"count": int(total or 0)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def _empty_aggregation_result() -> dict:
     return {
         "collection_count": 0,

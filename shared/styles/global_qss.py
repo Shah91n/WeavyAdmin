@@ -1219,6 +1219,10 @@ QScrollArea#diagScroll {{
     border: none;
 }}
 
+QWidget#diagContent {{
+    background-color: {COLOR_PRIMARY_BG};
+}}
+
 QLabel#diagViewTitle {{
     font-size: 18px;
     font-weight: bold;
@@ -1229,68 +1233,12 @@ QLabel#diagSectionTitle {{
     font-size: 14px;
     font-weight: bold;
     color: {COLOR_TEXT_PRIMARY};
-    padding: 2px 0;
-}}
-
-QLabel#diagSubHeader {{
-    color: {COLOR_ACCENT_GREEN};
-    font-weight: bold;
-    font-size: 12px;
-}}
-
-QLabel#diagDetailText {{
-    color: {COLOR_TEXT_PRIMARY};
-    font-size: 12px;
+    padding: 6px 0 4px 0;
 }}
 
 QLabel#diagLoadingLabel {{
     color: {COLOR_TEXT_SECONDARY};
     font-style: italic;
-}}
-
-QLabel#diagSmallTip {{
-    color: {COLOR_TEXT_SECONDARY};
-    font-size: 12px;
-}}
-
-QLabel#diagItalicTip {{
-    color: {COLOR_TEXT_SECONDARY};
-    font-size: 11px;
-    font-style: italic;
-}}
-
-QLabel#diagFilterLabel {{
-    color: {COLOR_TEXT_SECONDARY};
-    font-size: 12px;
-}}
-
-QFrame#diagCard {{
-    background-color: {COLOR_SECONDARY_BG};
-    border: 1px solid {COLOR_BORDER};
-    border-radius: 8px;
-}}
-
-QLabel#diagCardTitle {{
-    color: {COLOR_TEXT_SECONDARY};
-    font-size: 11px;
-    font-weight: 600;
-}}
-
-QLabel#diagCardValue {{
-    font-size: 20px;
-    font-weight: bold;
-}}
-
-QLabel#diagCardValue[tone="default"] {{
-    color: {COLOR_TEXT_PRIMARY};
-}}
-
-QLabel#diagCardValue[tone="success"] {{
-    color: {COLOR_ACCENT_GREEN};
-}}
-
-QLabel#diagCardValue[tone="error"] {{
-    color: {COLOR_ERROR};
 }}
 
 QFrame#diagStatusBanner {{
@@ -1345,10 +1293,6 @@ QFrame#collapsibleSection {{
     background-color: {COLOR_SECONDARY_BG};
     border: 1px solid {COLOR_BORDER};
     border-radius: 6px;
-}}
-
-QFrame#diagSeparator {{
-    color: {COLOR_BORDER};
 }}
 
 QPushButton#summaryToggle {{
@@ -1424,25 +1368,99 @@ QPushButton#diagSetReadyButton:disabled {{
     border: 1px solid {COLOR_BORDER};
 }}
 
-QComboBox#diagFilterCombo {{
-    background-color: {COLOR_SECONDARY_BG};
-    color: {COLOR_TEXT_PRIMARY};
-    border: 1px solid {COLOR_BORDER};
-    border-radius: 4px;
-    padding: 4px 8px;
+QPushButton#diagFixReplicationButton {{
+    background-color: {COLOR_WARNING_YELLOW};
+    color: {COLOR_PRIMARY_BG};
+    border: 1px solid {COLOR_WARNING_YELLOW};
+    border-radius: 6px;
+    padding: 6px 14px;
     font-size: 12px;
-    min-width: 180px;
+    font-weight: 600;
 }}
 
-QComboBox#diagFilterCombo::drop-down {{
-    border: none;
+QPushButton#diagFixReplicationButton:hover {{
+    background-color: {COLOR_ACCENT_GREEN_HOVER};
+    color: {COLOR_PRIMARY_BG};
+    border: 1px solid {COLOR_ACCENT_GREEN_HOVER};
 }}
 
-QComboBox#diagFilterCombo QAbstractItemView {{
-    background-color: {COLOR_SECONDARY_BG};
-    color: {COLOR_TEXT_PRIMARY};
+QPushButton#diagFixReplicationButton:disabled {{
+    background-color: {COLOR_BORDER};
+    color: {COLOR_DISABLED_TEXT};
     border: 1px solid {COLOR_BORDER};
-    selection-background-color: {COLOR_HOVER};
+}}
+
+QFrame#diagHealthCard {{
+    background-color: {COLOR_SECONDARY_BG};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 8px;
+}}
+
+QFrame#diagHealthCard[level="success"] {{
+    border: 1px solid {COLOR_ACCENT_GREEN};
+}}
+
+QFrame#diagHealthCard[level="warning"] {{
+    border: 1px solid {COLOR_WARNING_YELLOW};
+}}
+
+QFrame#diagHealthCard[level="error"] {{
+    border: 1px solid {COLOR_ERROR};
+}}
+
+QFrame#diagHealthCard[level="info"] {{
+    border: 1px solid {COLOR_BORDER};
+}}
+
+QLabel#diagHealthCardTitle {{
+    color: {COLOR_TEXT_SECONDARY};
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}}
+
+QLabel#diagHealthCardValue {{
+    font-size: 13px;
+    font-weight: 600;
+}}
+
+QLabel#diagHealthCardValue[level="success"] {{
+    color: {COLOR_ACCENT_GREEN};
+}}
+
+QLabel#diagHealthCardValue[level="warning"] {{
+    color: {COLOR_WARNING_YELLOW};
+}}
+
+QLabel#diagHealthCardValue[level="error"] {{
+    color: {COLOR_ERROR};
+}}
+
+QLabel#diagHealthCardValue[level="info"] {{
+    color: {COLOR_TEXT_SECONDARY};
+}}
+
+QLabel#diagSchemaSubHeader {{
+    color: {COLOR_TEXT_PRIMARY};
+    font-size: 13px;
+    font-weight: 600;
+    padding-top: 4px;
+}}
+
+QLabel#diagListItem {{
+    color: {COLOR_TEXT_PRIMARY};
+    font-size: 12px;
+    padding: 2px 0 2px 12px;
+}}
+
+QScrollArea#diagScrollList {{
+    background-color: {COLOR_PRIMARY_BG};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 6px;
+}}
+
+QWidget#diagScrollListInner {{
+    background-color: {COLOR_PRIMARY_BG};
 }}
 
 QTableWidget#diagTable {{

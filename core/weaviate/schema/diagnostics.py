@@ -96,10 +96,12 @@ def check_shard_consistency(nodes_info: list[dict]) -> list[dict] | None:
 
 
 def diagnose_schema() -> dict:
-    """
-    Run comprehensive schema diagnostics.
+    """Run schema diagnostics — collection count, compression, replication.
 
-    Returns a dict with collection_count, compression_issues, replication_issues, all_checks.
+    Returns a dict with ``collection_count``, ``collection_count_status``,
+    ``collection_count_message``, ``compression_issues``, ``replication_issues``.
+    Each issues list contains pre-formatted ``"{name}: {summary}"`` strings
+    suitable for display.
     """
     try:
         manager = get_weaviate_manager()
@@ -110,23 +112,17 @@ def diagnose_schema() -> dict:
 
     collection_count = len(schema_config)
 
-    if collection_count >= 1000:
+    if collection_count > 2000:
         count_status = "critical"
         count_msg = (
             f"🔴 {collection_count} collections detected — "
             "CRITICAL: Immediate action needed. Strongly consider implementing Multi-Tenancy to consolidate collections."
         )
-    elif collection_count > 500:
-        count_status = "critical"
-        count_msg = (
-            f"⚠️⚠️ {collection_count} collections detected — "
-            "DANGEROUS: This exceeds safe limits. Multi-Tenancy should be implemented to reduce collection count."
-        )
-    elif collection_count >= 100:
+    elif collection_count >= 1000:
         count_status = "warning"
         count_msg = (
             f"⚠️ {collection_count} collections detected — "
-            "WARNING: Approaching recommended threshold. Consider implementing Multi-Tenancy architecture."
+            "WARNING: Approaching unsafe limits. Consider implementing Multi-Tenancy architecture."
         )
     else:
         count_status = "ok"
@@ -134,7 +130,6 @@ def diagnose_schema() -> dict:
 
     compression_issues: list[str] = []
     replication_issues: list[str] = []
-    all_checks: list[dict] = []
 
     for name in schema_config:
         try:
@@ -142,16 +137,16 @@ def diagnose_schema() -> dict:
             full_config = collection.config.get()
             cfg = full_config.to_dict() if hasattr(full_config, "to_dict") else {}
         except Exception:
-            logger.warning("aggregation: config fetch failed", exc_info=True)
+            logger.warning("diagnose_schema: config fetch failed", exc_info=True)
             cfg = {}
 
-        check = _diagnose_single_collection(name, cfg)
-        all_checks.append(check)
+        comp = _check_compression(cfg)
+        if comp["status"] != "ok":
+            compression_issues.append(f"{name}: {comp['summary']}")
 
-        if check["compression"]["status"] != "ok":
-            compression_issues.append(f"{name}: {check['compression']['summary']}")
-        if check["replication"]["status"] != "ok":
-            replication_issues.append(f"{name}: {check['replication']['summary']}")
+        rep = _check_replication(cfg)
+        if rep["status"] != "ok":
+            replication_issues.append(f"{name}: {rep['summary']}")
 
     return {
         "collection_count": collection_count,
@@ -159,23 +154,10 @@ def diagnose_schema() -> dict:
         "collection_count_message": count_msg,
         "compression_issues": compression_issues,
         "replication_issues": replication_issues,
-        "all_checks": all_checks,
-    }
-
-
-def _diagnose_single_collection(name: str, cfg: dict) -> dict:
-    return {
-        "collection": name,
-        "compression": _check_compression(cfg),
-        "replication": _check_replication(cfg),
     }
 
 
 def _check_compression(cfg: dict) -> dict:
-    details: list[str] = []
-    status = "ok"
-    summary = ""
-
     vi_cfg = cfg.get("vectorIndexConfig") or cfg.get("vectorizer_config") or {}
     vi_type = cfg.get("vectorIndexType", "hnsw")
 
@@ -184,103 +166,60 @@ def _check_compression(cfg: dict) -> dict:
     bq = vi_cfg.get("bq") or (quantizer.get("bq") if isinstance(quantizer, dict) else None)
     sq = vi_cfg.get("sq") or (quantizer.get("sq") if isinstance(quantizer, dict) else None)
 
-    has_compression = False
+    has_compression = any(q and q.get("enabled") for q in (pq, bq, sq))
 
-    if pq and pq.get("enabled"):
-        has_compression = True
-        details.append("✅ Product Quantization (PQ) enabled")
-        details.append(f"   Segments: {pq.get('segments', 'auto')}")
-    if bq and bq.get("enabled"):
-        has_compression = True
-        details.append("✅ Binary Quantization (BQ) enabled")
-    if sq and sq.get("enabled"):
-        has_compression = True
-        details.append("✅ Scalar Quantization (SQ) enabled")
-
-    if not has_compression:
-        if str(vi_type).lower() == "flat":
-            details.append("ℹ️ Flat index — compression not applicable")
-            status = "ok"
-            summary = "Flat index"
-        else:
-            status = "warning"
-            summary = "No compression enabled"
-            details.append("⚠️ No compression (PQ/BQ/SQ) is enabled")
-            details.append("💡 Recommendation: enable compression for better memory usage")
-    else:
-        summary = "Compression configured"
-
-    details.insert(0, f"Vector index type: {vi_type}")
-
-    return {"status": status, "details": details, "summary": summary}
+    if has_compression:
+        return {"status": "ok", "summary": "Compression configured"}
+    if str(vi_type).lower() == "flat":
+        return {"status": "ok", "summary": "Flat index — compression not applicable"}
+    return {"status": "warning", "summary": "Compression disabled"}
 
 
 def _check_replication(cfg: dict) -> dict:
-    details: list[str] = []
-    status = "ok"
-    summary = ""
+    """Inspect a collection's replication config and return a clean one-line summary.
 
+    Summary format is intentionally readable — the diagnose view shows it directly
+    next to the collection name, so it must stand on its own. RF=N appears in
+    every relevant line so the reader doesn't have to infer the replication
+    factor from context.
+    """
     rep_cfg = cfg.get("replicationConfig") or cfg.get("replication_config") or {}
     factor = rep_cfg.get("factor", 1)
     async_enabled = rep_cfg.get("asyncEnabled", None)
     deletion_strategy = rep_cfg.get("deletionStrategy", None)
 
-    details.append(f"Replication factor: {factor}")
-
-    issues = []
+    problems: list[str] = []
+    severity = "ok"  # promoted to "warning" or "critical" as problems are found
 
     if factor < 2:
-        issues.append("Replication factor < 2 — no redundancy")
-        details.append("⚠️ Factor < 2 — data is not replicated")
+        problems.append(f"RF={factor} — no replication redundancy")
+        severity = "warning"
     elif factor % 2 == 0:
-        issues.append(f"Even replication factor ({factor})")
-        details.append(f"⚠️ Even factor ({factor}) — odd numbers work better for RAFT consensus")
-    else:
-        details.append(f"✅ Odd replication factor ({factor})")
+        problems.append(f"RF={factor} is even — odd RF (3, 5, 7) recommended for RAFT consensus")
+        severity = "warning"
 
-    if async_enabled is True:
-        details.append("✅ Async replication enabled")
-    elif async_enabled is False:
-        if factor > 1:
-            issues.append("asyncEnabled is false with replication > 1")
-            details.append("🔴 CRITICAL: asyncEnabled is false — consistency issues likely!")
-        else:
-            details.append("ℹ️ asyncEnabled is false (OK for factor=1)")
-    else:
-        if factor > 1:
-            issues.append("asyncEnabled not set with replication > 1")
-            details.append(
-                "⚠️ asyncEnabled not set (default) — should be explicitly enabled for replication > 1"
-            )
-        else:
-            details.append("ℹ️ asyncEnabled not set (default, OK for factor=1)")
+    if factor > 1:
+        if async_enabled is False:
+            problems.append(f"Async replication disabled (RF={factor}) — consistency risk")
+            severity = "critical"
+        elif async_enabled is None:
+            problems.append(f"Async replication not set (RF={factor}) — should be enabled")
+            if severity == "ok":
+                severity = "warning"
 
-    if deletion_strategy:
-        ds = str(deletion_strategy)
-        if ds in ("TimeBasedResolution", "DeleteOnConflict"):
-            details.append(f"✅ Deletion strategy: {ds}")
+        if not deletion_strategy:
+            problems.append(f"No deletion strategy (RF={factor}) — data loss risk on conflicts")
+            severity = "critical"
         else:
-            details.append(
-                f"⚠️ Deletion strategy '{ds}' — consider TimeBasedResolution or DeleteOnConflict"
-            )
-    else:
-        if factor > 1:
-            issues.append("Missing deletion strategy with replication > 1")
-            details.append(
-                "🔴 CRITICAL: No deletion strategy set with factor > 1 — data loss risk on deletion!"
-            )
-        else:
-            details.append("ℹ️ No deletion strategy set (OK for factor=1)")
+            ds = str(deletion_strategy)
+            if ds not in ("TimeBasedResolution", "DeleteOnConflict"):
+                problems.append(
+                    f"Deletion strategy '{ds}' — TimeBasedResolution or DeleteOnConflict recommended"
+                )
+                if severity == "ok":
+                    severity = "warning"
 
-    if issues:
-        has_critical_issue = any(
-            "Missing deletion strategy with replication" in issue
-            or "asyncEnabled is false with replication" in issue
-            for issue in issues
-        )
-        status = "critical" if has_critical_issue or factor < 2 else "warning"
-        summary = "; ".join(issues)
-    else:
-        summary = "Replication properly configured"
+    if not problems:
+        return {"status": "ok", "summary": f"RF={factor} — replication properly configured"}
 
-    return {"status": status, "details": details, "summary": summary}
+    return {"status": severity, "summary": "; ".join(problems)}

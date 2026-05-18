@@ -254,11 +254,12 @@ class DashboardView(QWidget):
         self._card_provider = _MetricCard("☁️", "Provider")
         self._card_backup = _MetricCard("💾", "Backup")
 
-        # Row 2 – scale & data (4 cards)
+        # Row 2 – scale & data (5 cards)
+        self._card_version = _MetricCard("🏷️", "Server Version")
         self._card_nodes = _MetricCard("🖥️", "Active Nodes")
         self._card_collections = _MetricCard("📦", "Collections")
         self._card_shards = _MetricCard("🗂️", "Total Shards")
-        self._card_version = _MetricCard("🏷️", "Server Version")
+        self._card_total_objects = _MetricCard("🧮", "Total Objects")
 
         # Each row is an independent HBox so both fill the full width
         cards_layout = QVBoxLayout()
@@ -279,10 +280,11 @@ class DashboardView(QWidget):
         row2 = QHBoxLayout()
         row2.setSpacing(10)
         for card in (
+            self._card_version,
             self._card_nodes,
             self._card_collections,
             self._card_shards,
-            self._card_version,
+            self._card_total_objects,
         ):
             row2.addWidget(card)
         cards_layout.addLayout(row2)
@@ -439,6 +441,7 @@ class DashboardView(QWidget):
             self._card_version,
         ):
             card.set_value("…", COLOR_TEXT_SECONDARY)
+        self._card_total_objects.set_value("Calculating…", COLOR_TEXT_SECONDARY)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public API
@@ -463,10 +466,20 @@ class DashboardView(QWidget):
             self._card_collections,
             self._card_shards,
             self._card_version,
+            self._card_total_objects,
         ):
             card.set_value("–")
 
         self._env_endpoint.set_value(message, "error")
+
+    def set_total_objects(self, total: int) -> None:
+        """Populate the Total Objects card (combined MT + non-MT)."""
+        self._card_total_objects.set_value(f"{total:,}")
+
+    def set_total_objects_error(self, message: str) -> None:
+        """Show an error state on the Total Objects card."""
+        self._card_total_objects.set_value("Error", COLOR_ERROR)
+        self._card_total_objects.setToolTip(message)
 
     def set_infra_available(self, available: bool) -> None:
         """Enable or disable infra-required quick action buttons."""

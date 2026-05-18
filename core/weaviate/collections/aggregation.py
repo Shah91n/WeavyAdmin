@@ -189,6 +189,67 @@ def aggregate_one_collection(collection_name: str) -> dict:
         return {"error": str(e)}
 
 
+def get_total_objects_combined() -> dict:
+    """Return the combined object count across all collections and tenants.
+
+    Lightweight variant of ``aggregate_collections`` that skips per-row detail
+    and is safe to run on large clusters from a background thread. Per-collection
+    or per-tenant failures are tolerated — the partial total is still returned.
+
+    Returns:
+        ``{"total": int, "errors": int}`` on success, ``{"error": str}`` on a
+        fatal failure (no client / connection lost).
+    """
+    try:
+        manager = get_weaviate_manager()
+        client = manager.client
+        collections = client.collections.list_all() or []
+
+        total = 0
+        errors = 0
+
+        for collection_name in collections:
+            try:
+                collection = client.collections.use(collection_name)
+                is_multi_tenant = False
+                try:
+                    is_multi_tenant = collection.config.get().multi_tenancy_config.enabled
+                except Exception:
+                    logger.warning(
+                        "total_objects: MT config fetch failed for %s",
+                        collection_name,
+                        exc_info=True,
+                    )
+
+                if is_multi_tenant:
+                    try:
+                        tenants = collection.tenants.get() or {}
+                    except Exception:
+                        errors += 1
+                        continue
+                    for tenant_name in tenants:
+                        try:
+                            total += (
+                                collection.with_tenant(tenant_name)
+                                .aggregate.over_all(total_count=True)
+                                .total_count
+                                or 0
+                            )
+                        except Exception:
+                            errors += 1
+                else:
+                    try:
+                        total += collection.aggregate.over_all(total_count=True).total_count or 0
+                    except Exception:
+                        errors += 1
+            except Exception:
+                errors += 1
+
+        return {"total": int(total), "errors": errors}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def aggregate_one_tenant(collection_name: str, tenant_name: str) -> dict:
     """Return ``{"count": int}`` for a single tenant of an MT collection, or ``{"error": str}``."""
     try:

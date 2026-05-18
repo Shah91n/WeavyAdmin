@@ -217,6 +217,36 @@ def check_collection_mt_status(collection_name: str) -> tuple[bool, bool]:
         return False, False
 
 
+_BATCH_SIZE = 500
+_LOG_FAILURE_CAP = 50
+
+
+def _collect_failed(batch: Any) -> list[dict[str, str]]:
+    """Read batch.failed_objects and convert to a serializable list."""
+    failed_list: list[dict[str, str]] = []
+    for failed_obj in getattr(batch, "failed_objects", None) or []:
+        uuid_str = "Unknown"
+        obj_ = getattr(failed_obj, "object_", None)
+        if obj_ is not None and hasattr(obj_, "uuid"):
+            uuid_str = str(obj_.uuid)
+        failed_list.append({"uuid": uuid_str, "message": getattr(failed_obj, "message", "")})
+    return failed_list
+
+
+def _log_batch_outcome(
+    log_callback: Callable[[str], None], submitted: int, failed_list: list[dict[str, str]]
+) -> None:
+    """Emit a summary + per-failure lines (capped) to the log callback."""
+    success = submitted - len(failed_list)
+    log_callback(
+        f"Batch flushed: {success} succeeded, {len(failed_list)} failed (of {submitted} submitted)."
+    )
+    for i, f in enumerate(failed_list[:_LOG_FAILURE_CAP], 1):
+        log_callback(f"  Failure {i}: {f['uuid']} — {f['message']}")
+    if len(failed_list) > _LOG_FAILURE_CAP:
+        log_callback(f"  ... and {len(failed_list) - _LOG_FAILURE_CAP} more failures")
+
+
 def batch_ingest_standard(
     collection_name: str,
     rows: Iterable[dict[str, Any]],
@@ -225,14 +255,15 @@ def batch_ingest_standard(
     vector_column: str | None = None,
     total_count: int | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    log_callback: Callable[[str], None] | None = None,
 ) -> tuple[int, list[dict[str, str]]]:
     """Ingest rows into a standard collection. Returns (success_count, failed_objects)."""
+    submitted = 0
+    failed_list: list[dict[str, str]] = []
+    batch: Any = None
     try:
         collection = get_weaviate_manager().client.collections.use(collection_name)
-        success_count = 0
-        processed = 0
-
-        with collection.batch.fixed_size(batch_size=500) as batch:
+        with collection.batch.fixed_size(batch_size=_BATCH_SIZE) as batch:
             for row in rows:
                 sanitized_obj, vector = map_row_to_properties(
                     row, header_map, vector_column if is_byov else None
@@ -242,28 +273,29 @@ def batch_ingest_standard(
                     batch.add_object(properties=sanitized_obj, vector=vector, uuid=uuid)
                 else:
                     batch.add_object(properties=sanitized_obj, uuid=uuid)
-                success_count += 1
-                processed += 1
-                if progress_callback and processed % 100 == 0:
-                    progress_callback(processed, total_count or processed)
+                submitted += 1
+                if submitted % 100 == 0:
+                    if progress_callback:
+                        progress_callback(submitted, total_count or submitted)
+                    if log_callback:
+                        log_callback(f"Submitted {submitted} rows to batch...")
 
         if progress_callback:
-            progress_callback(processed, total_count or processed)
+            progress_callback(submitted, total_count or submitted)
 
-        failed_list = []
-        for failed_obj in batch.failed_objects or []:
-            failed_list.append(
-                {
-                    "uuid": str(failed_obj.object_.uuid)
-                    if hasattr(failed_obj.object_, "uuid")
-                    else "Unknown",
-                    "message": failed_obj.message,
-                }
-            )
-        return success_count - len(failed_list), failed_list
+        failed_list = _collect_failed(batch)
+        if log_callback:
+            _log_batch_outcome(log_callback, submitted, failed_list)
 
     except Exception as e:
-        return 0, [{"uuid": "N/A", "message": f"Batch ingestion error: {e}"}]
+        if batch is not None:
+            failed_list = _collect_failed(batch)
+        failed_list.append({"uuid": "N/A", "message": f"Batch ingestion error: {e}"})
+        if log_callback:
+            log_callback(f"Exception during batch ingestion: {e}")
+            _log_batch_outcome(log_callback, submitted, failed_list)
+
+    return submitted - len(failed_list), failed_list
 
 
 def batch_ingest_mt(
@@ -275,15 +307,16 @@ def batch_ingest_mt(
     vector_column: str | None = None,
     total_count: int | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    log_callback: Callable[[str], None] | None = None,
 ) -> tuple[int, list[dict[str, str]]]:
     """Ingest rows into an MT collection under the given tenant. Returns (success_count, failed_objects)."""
+    submitted = 0
+    failed_list: list[dict[str, str]] = []
+    batch: Any = None
     try:
         collection = get_weaviate_manager().client.collections.use(collection_name)
         tenant_collection = collection.with_tenant(tenant_name)
-        success_count = 0
-        processed = 0
-
-        with tenant_collection.batch.fixed_size(batch_size=500) as batch:
+        with tenant_collection.batch.fixed_size(batch_size=_BATCH_SIZE) as batch:
             for row in rows:
                 sanitized_obj, vector = map_row_to_properties(
                     row, header_map, vector_column if is_byov else None
@@ -293,25 +326,26 @@ def batch_ingest_mt(
                     batch.add_object(properties=sanitized_obj, vector=vector, uuid=uuid)
                 else:
                     batch.add_object(properties=sanitized_obj, uuid=uuid)
-                success_count += 1
-                processed += 1
-                if progress_callback and processed % 100 == 0:
-                    progress_callback(processed, total_count or processed)
+                submitted += 1
+                if submitted % 100 == 0:
+                    if progress_callback:
+                        progress_callback(submitted, total_count or submitted)
+                    if log_callback:
+                        log_callback(f"Submitted {submitted} rows to batch...")
 
         if progress_callback:
-            progress_callback(processed, total_count or processed)
+            progress_callback(submitted, total_count or submitted)
 
-        failed_list = []
-        for failed_obj in batch.failed_objects or []:
-            failed_list.append(
-                {
-                    "uuid": str(failed_obj.object_.uuid)
-                    if hasattr(failed_obj.object_, "uuid")
-                    else "Unknown",
-                    "message": failed_obj.message,
-                }
-            )
-        return success_count - len(failed_list), failed_list
+        failed_list = _collect_failed(batch)
+        if log_callback:
+            _log_batch_outcome(log_callback, submitted, failed_list)
 
     except Exception as e:
-        return 0, [{"uuid": "N/A", "message": f"Batch ingestion error: {e}"}]
+        if batch is not None:
+            failed_list = _collect_failed(batch)
+        failed_list.append({"uuid": "N/A", "message": f"Batch ingestion error: {e}"})
+        if log_callback:
+            log_callback(f"Exception during batch ingestion: {e}")
+            _log_batch_outcome(log_callback, submitted, failed_list)
+
+    return submitted - len(failed_list), failed_list

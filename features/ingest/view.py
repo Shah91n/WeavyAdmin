@@ -3,8 +3,6 @@ UI view for CSV data ingestion with drag-and-drop support.
 Supports both standard and Multi-Tenant collections.
 """
 
-import logging
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
@@ -19,6 +17,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -33,8 +32,6 @@ from core.weaviate.collections import (
 from features.ingest.worker import IngestWorker
 from shared.worker_mixin import WorkerMixin
 
-logger = logging.getLogger(__name__)
-
 
 class DropZone(QFrame):
     """Drag-and-drop zone for CSV files."""
@@ -47,13 +44,14 @@ class DropZone(QFrame):
     def init_ui(self) -> None:
         self.setAcceptDrops(True)
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
-        self.setMinimumHeight(150)
+        self.setFixedHeight(90)
         self.setObjectName("ingestDropZone")
         self.setProperty("state", "idle")
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 4)
 
-        label = QLabel("📁 Drag & Drop CSV File Here\n\nor click 'Browse' button below")
+        label = QLabel("📁 Drag a CSV file here, or use the Browse button")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setObjectName("ingestDropZoneLabel")
         layout.addWidget(label)
@@ -102,33 +100,31 @@ class IngestView(QWidget, WorkerMixin):
         """Initialize the UI."""
         self.setObjectName("ingestView")
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
+        layout.setSpacing(10)
 
         # Title
         title = QLabel("CSV Data Ingestion")
         title.setObjectName("ingestTitle")
         layout.addWidget(title)
 
-        # File Selection Section
         file_group = QGroupBox("1. Select CSV File")
-        file_layout = QVBoxLayout(file_group)
+        file_layout = QHBoxLayout(file_group)
 
-        # Drop zone
         self.drop_zone = DropZone(self._on_file_selected)
-        file_layout.addWidget(self.drop_zone)
+        self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        file_layout.addWidget(self.drop_zone, 1)
 
-        # Browse button
-        browse_layout = QHBoxLayout()
+        browse_column = QVBoxLayout()
         self.browse_btn = QPushButton("Browse...")
         self.browse_btn.clicked.connect(self._browse_file)
-        browse_layout.addWidget(self.browse_btn)
+        browse_column.addWidget(self.browse_btn)
 
         self.file_label = QLabel("No file selected")
         self.file_label.setObjectName("ingestFileLabel")
-        browse_layout.addWidget(self.file_label)
-        browse_layout.addStretch()
+        browse_column.addWidget(self.file_label)
+        browse_column.addStretch()
 
-        file_layout.addLayout(browse_layout)
+        file_layout.addLayout(browse_column)
         layout.addWidget(file_group)
 
         # Configuration Section
@@ -203,23 +199,17 @@ class IngestView(QWidget, WorkerMixin):
         auto_detect_layout.addWidget(self.auto_detect_input)
         config_layout.addLayout(auto_detect_layout)
 
-        # Info text
-        info_text = QTextEdit()
-        info_text.setReadOnly(True)
-        info_text.setMinimumHeight(110)
-        info_text.setMaximumHeight(110)
-        info_text.setText(
-            "Multi-Tenancy Logic:\n"
-            "• MT Mode: Select an existing MT collection or create a new one, then provide a tenant name\n"
-            "• Standard Mode: Provide a collection name for non-MT ingestion\n"
-            "• BYOV Mode: Ensure your CSV has a 'vector' or 'embedding' column"
+        info_label = QLabel(
+            "MT: pick existing or create new + tenant name.   "
+            "Standard: provide collection name.   "
+            "BYOV: CSV must have a vector/embedding column."
         )
-        info_text.setObjectName("ingestInfoText")
-        config_layout.addWidget(info_text)
+        info_label.setObjectName("ingestInfoText")
+        info_label.setWordWrap(True)
+        config_layout.addWidget(info_label)
 
         layout.addWidget(config_group)
 
-        # Progress Section
         progress_group = QGroupBox("3. Ingestion Progress")
         progress_layout = QVBoxLayout(progress_group)
 
@@ -233,9 +223,16 @@ class IngestView(QWidget, WorkerMixin):
         self.progress_label.setObjectName("ingestProgressLabel")
         progress_layout.addWidget(self.progress_label)
 
-        layout.addWidget(progress_group)
+        self.log_box = QTextEdit()
+        self.log_box.setReadOnly(True)
+        self.log_box.setObjectName("ingestLogBox")
+        self.log_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.log_box.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
+        progress_layout.addWidget(self.log_box, 1)
 
-        # Action Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
@@ -250,13 +247,14 @@ class IngestView(QWidget, WorkerMixin):
         self.cancel_btn.clicked.connect(self._cancel_ingestion)
         button_layout.addWidget(self.cancel_btn)
 
-        layout.addLayout(button_layout)
-        layout.addStretch()
+        progress_layout.addLayout(button_layout)
 
         self.summary_label = QLabel("Summary: Ready")
         self.summary_label.setObjectName("ingestSummary")
         self.summary_label.setWordWrap(True)
-        layout.addWidget(self.summary_label)
+        progress_layout.addWidget(self.summary_label)
+
+        layout.addWidget(progress_group, 1)
 
         # Connect signals after all UI elements are created
         self.vectorizer_combo.currentIndexChanged.connect(self._on_vectorizer_changed)
@@ -399,6 +397,7 @@ class IngestView(QWidget, WorkerMixin):
         # Reset progress
         self.progress_bar.setValue(0)
         self.progress_label.setText("Starting ingestion...")
+        self.log_box.clear()
 
         # Get configuration
         is_mt = self.mt_checkbox.isChecked()
@@ -436,7 +435,7 @@ class IngestView(QWidget, WorkerMixin):
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
-        self._worker.failed_objects.connect(self._on_failed_objects)
+        self._worker.log_message.connect(self._on_log_message)
 
         # Start worker
         self._worker.start()
@@ -456,13 +455,12 @@ class IngestView(QWidget, WorkerMixin):
         self.progress_bar.setValue(current)
         self.progress_label.setText(message)
 
-    def _on_finished(self, success_count: int, total_count: int) -> None:
+    def _on_finished(self, success_count: int, failed_count: int, total_count: int) -> None:
         """Handle successful completion."""
         self._detach_worker()
         self._reset_ui()
         self.progress_bar.setValue(100)
         self.progress_label.setText(f"Completed: {success_count}/{total_count} objects ingested")
-        failed_count = total_count - success_count
         self.summary_label.setText(
             f"Summary: Total {total_count} | Success {success_count} | Failed {failed_count}"
         )
@@ -474,16 +472,11 @@ class IngestView(QWidget, WorkerMixin):
         self.progress_label.setText("Error occurred")
         self.summary_label.setText(f"Summary: Error - {error_message}")
 
-    def _on_failed_objects(self, failed_list: list):
-        """Handle failed objects report."""
-        details = "Summary: Some objects failed to ingest.\n"
-        for i, failed_obj in enumerate(failed_list[:5], 1):
-            uuid = failed_obj.get("uuid", "Unknown")
-            message = failed_obj.get("message", "No error message")
-            details += f"{i}. {uuid}: {message}\n"
-        if len(failed_list) > 5:
-            details += f"... and {len(failed_list) - 5} more failures"
-        self.summary_label.setText(details)
+    def _on_log_message(self, line: str) -> None:
+        """Append a streaming log line to the log box and auto-scroll."""
+        self.log_box.append(line)
+        scrollbar = self.log_box.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def _reset_ui(self) -> None:
         """Reset UI controls after ingestion completes or fails."""

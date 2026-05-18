@@ -1,26 +1,12 @@
-"""
-Query Agent View – natural-language interface to the Weaviate Query Agent.
+"""Query Agent view — natural-language interface to the Weaviate Query Agent.
 
-Layout
-------
-┌─────────────────────────────────────────┐
-│ Query Agent  (title)                    │
-├────────────────┬────────────────────────┤
-│ Collections    │ Mode: [Search] [Ask]   │
-│ (checkboxes)   │                        │
-│ [Fetch]        │                        │
-├────────────────┴────────────────────────┤
-│              Chat area                  │
-│  (conversation bubbles + result tables) │
-├─────────────────────────────────────────┤
-│ [Text input]              [Send] [Clear]│
-└─────────────────────────────────────────┘
+Supports three modes: Ask (generated answer), Search (retrieval only),
+and Suggest (propose example queries for the selected collections).
 """
 
 import contextlib
-import logging
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -31,6 +17,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -43,8 +30,6 @@ from features.query.agent_worker import QueryAgentWorker
 from features.schema.worker import SchemaWorker
 from shared.worker_mixin import WorkerMixin, _orphan_worker
 
-logger = logging.getLogger(__name__)
-
 
 class QueryAgentView(QWidget, WorkerMixin):
     """Main view for the Weaviate Query Agent feature."""
@@ -53,10 +38,8 @@ class QueryAgentView(QWidget, WorkerMixin):
         super().__init__()
         self._worker: QueryAgentWorker | None = None
         self._schema_worker: SchemaWorker | None = None
-        # Conversation history for multi-turn "ask" mode.
-        # Each entry: {"role": "user"|"assistant", "content": str}
         self._history: list[dict] = []
-        self._mode: str = "ask"  # "search" | "ask"
+        self._mode: str = "ask"
         self._setup_ui()
         self._fetch_collections()
 
@@ -158,16 +141,35 @@ class QueryAgentView(QWidget, WorkerMixin):
         self._btn_search.setChecked(False)
         self._btn_search.clicked.connect(lambda: self._set_mode("search"))
         mode_btn_row.addWidget(self._btn_search)
+
+        self._btn_suggest = QPushButton("Suggest")
+        self._btn_suggest.setObjectName("queryAgentModeInactive")
+        self._btn_suggest.setCheckable(True)
+        self._btn_suggest.setChecked(False)
+        self._btn_suggest.clicked.connect(lambda: self._set_mode("suggest"))
+        mode_btn_row.addWidget(self._btn_suggest)
         mode_btn_row.addStretch()
         mode_layout.addLayout(mode_btn_row)
 
-        mode_hint = QLabel(
-            "<b>Ask</b> — generates a natural-language answer.<br>"
-            "<b>Search</b> — returns matching objects (no generation)."
-        )
-        mode_hint.setObjectName("queryAgentModeHint")
-        mode_hint.setWordWrap(True)
-        mode_layout.addWidget(mode_hint)
+        self._mode_hint = QLabel()
+        self._mode_hint.setObjectName("queryAgentModeHint")
+        self._mode_hint.setWordWrap(True)
+        mode_layout.addWidget(self._mode_hint)
+
+        self._suggest_options = QWidget()
+        suggest_opts_layout = QHBoxLayout(self._suggest_options)
+        suggest_opts_layout.setContentsMargins(0, 0, 0, 0)
+        suggest_opts_layout.setSpacing(6)
+        suggest_opts_layout.addWidget(QLabel("Suggestions:"))
+        self._num_queries_spin = QSpinBox()
+        self._num_queries_spin.setRange(1, 10)
+        self._num_queries_spin.setValue(3)
+        self._num_queries_spin.setObjectName("queryAgentNumQueriesSpin")
+        suggest_opts_layout.addWidget(self._num_queries_spin)
+        suggest_opts_layout.addStretch()
+        mode_layout.addWidget(self._suggest_options)
+        self._suggest_options.setVisible(False)
+
         mode_layout.addStretch()
 
         controls_splitter.addWidget(mode_panel)
@@ -214,18 +216,22 @@ class QueryAgentView(QWidget, WorkerMixin):
 
         self._send_btn = QPushButton("Send")
         self._send_btn.setObjectName("queryAgentSendButton")
-        self._send_btn.setFixedSize(QSize(72, 34))
+        self._send_btn.setMinimumHeight(34)
+        self._send_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self._send_btn.clicked.connect(self._on_send)
         btn_col.addWidget(self._send_btn)
 
         self._clear_btn = QPushButton("Clear")
         self._clear_btn.setObjectName("secondaryButton")
-        self._clear_btn.setFixedSize(QSize(72, 34))
+        self._clear_btn.setMinimumHeight(34)
+        self._clear_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self._clear_btn.clicked.connect(self._on_clear)
         btn_col.addWidget(self._clear_btn)
 
         input_row.addLayout(btn_col)
         root.addWidget(input_frame)
+
+        self._set_mode("ask")
 
     # ------------------------------------------------------------------
     # Event filter – Enter sends, Shift+Enter inserts newline
@@ -314,31 +320,56 @@ class QueryAgentView(QWidget, WorkerMixin):
     # Mode toggle
     # ------------------------------------------------------------------
 
+    _MODE_HINTS: dict[str, str] = {
+        "ask": (
+            "<b>Ask</b> — generates a natural-language answer.<br>"
+            "<b>Search</b> — returns matching objects (no generation).<br>"
+            "<b>Suggest</b> — proposes example queries based on your data."
+        ),
+        "search": (
+            "<b>Ask</b> — generates a natural-language answer.<br>"
+            "<b>Search</b> — returns matching objects (no generation).<br>"
+            "<b>Suggest</b> — proposes example queries based on your data."
+        ),
+        "suggest": (
+            "<b>Suggest</b> — generates example queries for the selected collections. "
+            "Use the optional input box as <i>instructions</i> to steer the suggestions."
+        ),
+    }
+
+    _INPUT_PLACEHOLDERS: dict[str, str] = {
+        "ask": "Type your question… (Shift+Enter for new line, Enter to send)",
+        "search": "Type your search query… (Shift+Enter for new line, Enter to send)",
+        "suggest": (
+            'Optional instructions — e.g. "customer lookup questions based on country or email". '
+            "Leave empty for general suggestions."
+        ),
+    }
+
     def _set_mode(self, mode: str) -> None:
         self._mode = mode
-        if mode == "ask":
-            self._btn_ask.setObjectName("queryAgentModeActive")
-            self._btn_ask.setChecked(True)
-            self._btn_search.setObjectName("queryAgentModeInactive")
-            self._btn_search.setChecked(False)
-        else:
-            self._btn_search.setObjectName("queryAgentModeActive")
-            self._btn_search.setChecked(True)
-            self._btn_ask.setObjectName("queryAgentModeInactive")
-            self._btn_ask.setChecked(False)
-        # Force style refresh
-        for btn in (self._btn_ask, self._btn_search):
+        buttons = {
+            "ask": self._btn_ask,
+            "search": self._btn_search,
+            "suggest": self._btn_suggest,
+        }
+        for key, btn in buttons.items():
+            active = key == mode
+            btn.setObjectName("queryAgentModeActive" if active else "queryAgentModeInactive")
+            btn.setChecked(active)
             btn.style().unpolish(btn)
             btn.style().polish(btn)
+
+        self._mode_hint.setText(self._MODE_HINTS[mode])
+        self._input.setPlaceholderText(self._INPUT_PLACEHOLDERS[mode])
+        self._suggest_options.setVisible(mode == "suggest")
+        self._send_btn.setText("Suggest" if mode == "suggest" else "Send")
 
     # ------------------------------------------------------------------
     # Send / clear
     # ------------------------------------------------------------------
 
     def _on_send(self) -> None:
-        query = self._input.toPlainText().strip()
-        if not query:
-            return
         if self._worker is not None:
             return
 
@@ -347,18 +378,40 @@ class QueryAgentView(QWidget, WorkerMixin):
             self._append_system_msg("Please select at least one collection before querying.")
             return
 
+        text = self._input.toPlainText().strip()
+        if self._mode in ("ask", "search") and not text:
+            return  # Ask/Search require a query — silently no-op on empty input.
+
         self._input.clear()
         self._send_btn.setEnabled(False)
-        self._append_user_bubble(query)
-        self._append_thinking_bubble()
 
-        self._worker = QueryAgentWorker(
-            query=query,
-            collections=collections,
-            mode=self._mode,
-            history=list(self._history) if self._mode == "ask" else [],
-        )
-        self._worker.finished.connect(lambda data: self._on_response(query, data))
+        if self._mode == "suggest":
+            num = self._num_queries_spin.value()
+            instructions = text or None
+            bubble_text = (
+                f"Generate {num} query suggestion(s)."
+                if not instructions
+                else f"Generate {num} suggestion(s) — instructions: {instructions}"
+            )
+            self._append_user_bubble(bubble_text)
+            self._append_thinking_bubble()
+            self._worker = QueryAgentWorker(
+                mode="suggest",
+                collections=collections,
+                num_queries=num,
+                instructions=instructions,
+            )
+        else:
+            self._append_user_bubble(text)
+            self._append_thinking_bubble()
+            self._worker = QueryAgentWorker(
+                mode=self._mode,
+                collections=collections,
+                query=text,
+                history=list(self._history) if self._mode == "ask" else [],
+            )
+
+        self._worker.finished.connect(lambda data: self._on_response(text, data))
         self._worker.error.connect(self._on_error)
         self._worker.start()
 
@@ -368,22 +421,39 @@ class QueryAgentView(QWidget, WorkerMixin):
         self._remove_thinking_bubble()
 
         mode = data["mode"]
-        answer = data["answer"]
-        objects = data["objects"]
 
         if mode == "ask":
-            self._append_assistant_bubble(answer)
-            # Update history for multi-turn
+            answer = data.get("answer", "")
+            sources = data.get("sources", [])
+            self._append_assistant_bubble(answer or "(no answer returned)")
             self._history.append({"role": "user", "content": original_query})
             self._history.append({"role": "assistant", "content": answer})
-            if objects:
-                self._append_results_table(objects, label="Supporting search results")
-        else:  # search
+            if sources:
+                collections_used = sorted({s["collection"] for s in sources if s.get("collection")})
+                self._append_assistant_bubble(
+                    f"Based on {len(sources)} source object(s) "
+                    f"across {len(collections_used)} collection(s): "
+                    f"{', '.join(collections_used)}."
+                )
+        elif mode == "search":
+            objects = data.get("objects", [])
             if objects:
                 self._append_assistant_bubble(f"Found {len(objects)} result(s):")
                 self._append_results_table(objects)
             else:
                 self._append_assistant_bubble("No matching results found.")
+        elif mode == "suggest":
+            suggestions = data.get("suggestions", [])
+            if suggestions:
+                self._append_assistant_bubble(
+                    f"Here are {len(suggestions)} suggested query(ies) — "
+                    "click one to load it into the input and switch to Ask mode:"
+                )
+                self._append_suggestion_buttons(suggestions)
+            else:
+                self._append_assistant_bubble(
+                    "No suggestions could be generated for the selected collection(s)."
+                )
 
         self._scroll_to_bottom()
 
@@ -487,6 +557,30 @@ class QueryAgentView(QWidget, WorkerMixin):
             bubble.setMaximumWidth(680)
 
         return wrapper
+
+    def _append_suggestion_buttons(self, suggestions: list[str]) -> None:
+        """Render suggested queries as clickable left-aligned buttons."""
+        wrapper = QWidget()
+        wrapper_layout = QVBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setSpacing(6)
+
+        for suggestion in suggestions:
+            if not suggestion:
+                continue
+            btn = QPushButton(suggestion)
+            btn.setObjectName("queryAgentSuggestionButton")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _, s=suggestion: self._use_suggestion(s))
+            wrapper_layout.addWidget(btn)
+
+        self._chat_layout.insertWidget(self._chat_layout.count() - 1, wrapper)
+
+    def _use_suggestion(self, suggestion: str) -> None:
+        """Load a suggested query into the input and switch to Ask mode."""
+        self._set_mode("ask")
+        self._input.setPlainText(suggestion)
+        self._input.setFocus()
 
     def _append_results_table(self, objects: list[dict], label: str = "") -> None:
         if not objects:

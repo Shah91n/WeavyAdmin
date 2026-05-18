@@ -54,14 +54,14 @@ Install these via your system package manager (Homebrew on macOS) and ensure the
 - **Shards Details** — all shards with search and filter
 - **Shards Indexing Status** — view every shard replica, bulk set READONLY → READY, multi-select actions
 - **Shard Rebalancer** — COPY/MOVE replica operations, compute and apply a balance plan, monitor replication operations (requires `REPLICA_MOVEMENT_ENABLED=true`)
-- **Collection Management** — create (Custom Schema or CSV), delete
+- **Collection Management** — create (Custom Schema or CSV); bulk-delete via the sidebar `×` button with a multi-select picker, filter, and per-collection results
 - **Aggregation Report** — per-collection / per-tenant counts with CSV export and a single-collection (or single-tenant) on-demand counter
 - **Schema Diagnostics** — cluster health checks, shard consistency, compression and replication analysis
 - **Search Data** — right-click any collection → choose BM25 keyword, Vector Similarity (near_text / near_vector), or Hybrid search; supports filters, metadata return, named vectors, and multi-tenancy
 - **RBAC Manager** — create/edit/delete roles, manage DB users and OIDC groups, assign/revoke roles
 - **RBAC Report & Logs** — aggregated insights and authorization audit log viewer
-- **Query Agent** — natural-language chat interface using the Weaviate Query Agent (Weaviate Cloud only)
-- **CSV Ingestion** — drag-and-drop CSV import with MT and BYOV support
+- **Query Agent** — natural-language chat using the Weaviate Query Agent (Weaviate Cloud only); supports **Ask** (generated answer), **Search** (retrieval only), and **Suggest** (propose example queries for the selected collections, with optional instructions and a configurable suggestion count)
+- **CSV Ingestion** — drag-and-drop CSV import with MT and BYOV support; live log box reports per-batch progress and surfaces each failed object reported by Weaviate
 - **Backups** — create, restore, cancel backups; usage statistics report
 - **Log Explorer** — live-tail Kubernetes pod logs with structured columns and real-time search
 - **LB Traffic** — HTTP Load Balancer / ALB traffic viewer for GCP and AWS
@@ -114,6 +114,7 @@ core/
     multitenancy/    MT check, tenant activity, tenant lookup, tenant list
     search/          BM25, vector similarity, hybrid search core functions
     objects/         Delete, read, update
+    agents/          Weaviate Agents — one module per agent (queryagent, …)
     rbac/            RBAC manager, report
     schema/          Diagnostics, schema, shards
   infra/             Pure subprocess wrappers for kubectl / gcloud / aws

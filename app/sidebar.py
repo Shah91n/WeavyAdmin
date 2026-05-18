@@ -86,6 +86,7 @@ class Sidebar(QWidget):
     tool_requested = pyqtSignal(str)  # Emits tool name when a tool is requested
     collection_action_requested = pyqtSignal(str, str)  # Emits (collection_name, action_type)
     create_collection_requested = pyqtSignal()  # Emits when the + button is clicked
+    delete_collections_requested = pyqtSignal()
 
     def __init__(self, get_schema_func, get_collection_schema_func) -> None:
         """
@@ -127,10 +128,20 @@ class Sidebar(QWidget):
 
         self.refresh_button = QPushButton("↻")
         self.refresh_button.setObjectName("schemaHeaderBtn")
+        self.refresh_button.setProperty("glyph", "refresh")
         self.refresh_button.setFixedSize(22, 22)
         self.refresh_button.setToolTip("Refresh schema")
         self.refresh_button.clicked.connect(self.refresh_schema)
         schema_header.add_action_button(self.refresh_button)
+
+        self.delete_collections_button = QPushButton("×")
+        self.delete_collections_button.setObjectName("schemaHeaderBtn")
+        self.delete_collections_button.setFixedSize(22, 22)
+        self.delete_collections_button.setToolTip("Delete one or more collections")
+        self.delete_collections_button.clicked.connect(
+            lambda: self.delete_collections_requested.emit()
+        )
+        schema_header.add_action_button(self.delete_collections_button)
 
         schema_layout.addWidget(schema_header)
         self.schema_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -645,16 +656,12 @@ class Sidebar(QWidget):
         if is_collection and collection_name:
             search_action = menu.addAction("🔍 Search Data")
             read_action = menu.addAction("📖 Read Data")
-            delete_action = menu.addAction("🗑️ Delete Collection")
 
             search_action.triggered.connect(
                 lambda: self.collection_action_requested.emit(collection_name, "search")
             )
             read_action.triggered.connect(
                 lambda: self.collection_action_requested.emit(collection_name, "read")
-            )
-            delete_action.triggered.connect(
-                lambda: self.collection_action_requested.emit(collection_name, "delete")
             )
 
             menu.addSeparator()
@@ -696,6 +703,24 @@ class Sidebar(QWidget):
     def set_pod_names(self, names: list[str]) -> None:
         """Cache pod names so the server-tree context menu can list them."""
         self._pod_names = list(names)
+
+    def current_collection_names(self) -> list[str]:
+        """Return collection names currently displayed in the schema tree.
+
+        Reads directly from the tree (the source of truth the user sees) rather
+        than caching, so the result can't lag behind a refresh or a stale state.
+        """
+        names: list[str] = []
+        for i in range(self.schema_tree.topLevelItemCount()):
+            item = self.schema_tree.topLevelItem(i)
+            if not item or item.isDisabled():
+                continue
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("type") == "collection":
+                name = data.get("name")
+                if name:
+                    names.append(name)
+        return names
 
     def _show_server_context_menu(self, position) -> None:
         """Context menu on the Server tree – 'Pods' item lists individual pods."""

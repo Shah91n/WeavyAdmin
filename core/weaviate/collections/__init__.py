@@ -24,7 +24,7 @@ from core.weaviate.collections.batch import (
     validate_csv_file,
 )
 from core.weaviate.collections.create import create_collection
-from core.weaviate.collections.delete import delete_collection
+from core.weaviate.collections.delete import bulk_delete_collections, delete_collection
 from core.weaviate.collections.update import (
     get_quantizer_config,
     update_collections_replication,
@@ -42,6 +42,7 @@ __all__ = [
     "batch_ingest_mt",
     "batch_ingest_standard",
     "build_header_map",
+    "bulk_delete_collections",
     "check_collection_mt_status",
     "check_vectorizer_requirements",
     "create_collection",

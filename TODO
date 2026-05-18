@@ -1,18 +1,7 @@
 [] Add update-available indicator in main UI (highlight key feature when a new version exists)
-[] Add UI in STS to add/remove modules and environments
+[] Add UI in STS to add/remove environments
 [] Implement live monitoring dashboard
-[] Add automated test suite
-[] Implement one-click auto-update (extend About dialog check to download and replace app)
-[] Add GitHub Actions release pipeline (build app and attach DMG on tagged releases)
-[] Add image search capability
-[] Add multimedia search capability
-[] Code-sign and notarize DMG for macOS distribution
-[] Refactor UX/UI in different Views for ease
-[] More work with STS (Scaling / STS Updates)
+
 [] Add loading bar for LB or Logs to show progress when fetching
-[] Delete all or Multi-Select Collections
 [] DeDup GoRoutines in the Profiling
-[] Print out data report of any table/list of data output 
 [] Pod Logs filtering
-[] Fix Bug in ingest It always say Fail despite success also print values as it ingest on the way
-[] Agents -> add Suggested queries

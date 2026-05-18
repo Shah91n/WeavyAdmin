@@ -567,6 +567,10 @@ QPushButton#schemaHeaderBtn:hover {{
 QPushButton#schemaHeaderBtn:pressed {{
     color: {COLOR_ACCENT_GREEN_PRESSED};
 }}
+
+QPushButton#schemaHeaderBtn[glyph="refresh"] {{
+    font-size: 12px;
+}}
 """
 
 # ---------------------------------------------------------------------------
@@ -1658,6 +1662,8 @@ QPushButton#queryAgentSendButton {{
     border-radius: 4px;
     font-weight: bold;
     font-size: 13px;
+    padding: 6px 14px;
+    min-width: 80px;
 }}
 
 QPushButton#queryAgentSendButton:hover {{
@@ -1667,6 +1673,30 @@ QPushButton#queryAgentSendButton:hover {{
 QPushButton#queryAgentSendButton:disabled {{
     background-color: {COLOR_BORDER};
     color: {COLOR_DISABLED_TEXT};
+}}
+
+QSpinBox#queryAgentNumQueriesSpin {{
+    background-color: {COLOR_SECONDARY_BG};
+    color: {COLOR_TEXT_PRIMARY};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 4px;
+    padding: 2px 4px;
+    min-width: 56px;
+}}
+
+QPushButton#queryAgentSuggestionButton {{
+    background-color: {COLOR_SECONDARY_BG};
+    color: {COLOR_TEXT_PRIMARY};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 13px;
+}}
+
+QPushButton#queryAgentSuggestionButton:hover {{
+    border-color: {COLOR_ACCENT_GREEN};
+    background-color: {COLOR_HOVER};
 }}
 """
 
@@ -2370,6 +2400,73 @@ QPushButton#primaryButton:disabled {{
 }}
 """
 
+_QSS_DELETE_COLLECTIONS_DIALOG = f"""
+QDialog#deleteCollectionsDialog {{
+    background-color: {COLOR_PRIMARY_BG};
+}}
+
+QLabel#deleteCollectionsTitle {{
+    color: {COLOR_TEXT_PRIMARY};
+    font-size: 14px;
+    font-weight: bold;
+}}
+
+QLabel#deleteCollectionsWarning {{
+    color: {COLOR_ERROR};
+    font-size: 12px;
+}}
+
+QLabel#deleteCollectionsCount,
+QLabel#deleteCollectionsResultsSummary {{
+    color: {COLOR_TEXT_SECONDARY};
+    font-size: 12px;
+}}
+
+QLineEdit#deleteCollectionsFilter {{
+    background-color: {COLOR_SECONDARY_BG};
+    color: {COLOR_TEXT_PRIMARY};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 4px;
+    padding: 4px 8px;
+}}
+
+QListWidget#deleteCollectionsList,
+QListWidget#deleteCollectionsResultsList {{
+    background-color: {COLOR_SECONDARY_BG};
+    color: {COLOR_TEXT_PRIMARY};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 4px;
+}}
+
+QListWidget#deleteCollectionsList::item {{
+    padding: 4px 6px;
+}}
+
+QListWidget#deleteCollectionsList::item:hover {{
+    background-color: {COLOR_HOVER};
+}}
+
+QPushButton#deleteCollectionsDeleteButton {{
+    background-color: {COLOR_ERROR};
+    color: {COLOR_TEXT_PRIMARY};
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    padding: 6px 14px;
+    min-width: 90px;
+}}
+
+QPushButton#deleteCollectionsDeleteButton:hover {{
+    background-color: {COLOR_ERROR_PRESSED};
+}}
+
+QPushButton#deleteCollectionsDeleteButton:disabled {{
+    background-color: {COLOR_BORDER};
+    color: {COLOR_DISABLED_TEXT};
+}}
+"""
+
+
 GLOBAL_STYLESHEET = (
     _QSS_BASE
     + _QSS_SPLITTER
@@ -2400,4 +2497,5 @@ GLOBAL_STYLESHEET = (
     + _QSS_BACKUPS
     + _QSS_SHARD_REBALANCER
     + _QSS_SEARCH
+    + _QSS_DELETE_COLLECTIONS_DIALOG
 )

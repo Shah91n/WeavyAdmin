@@ -58,6 +58,7 @@ core/                            Pure Python — ZERO Qt imports — testable in
     collections/                 Aggregation, batch, create, delete, update
     multitenancy/                MT check, tenant activity, tenant lookup, tenant list
     objects/                     Delete, read, update
+    agents/                      Weaviate Agents — one module per agent (queryagent, …)
     rbac/                        RBAC manager, report
     schema/                      Diagnostics, schema, shards
     search/                      BM25, vector similarity, hybrid search core functions
@@ -82,6 +83,7 @@ dialogs/                         Shared QDialogs — not owned by any single fea
   backup_dialogs.py
   connection_dialog.py
   create_collection_choice_dialog.py
+  delete_collections_dialog.py
   profiling_pod_selector_dialog.py
   property_settings_dialog.py
   rbac_dialogs.py

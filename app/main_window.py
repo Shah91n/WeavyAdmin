@@ -28,7 +28,6 @@ from core.connection.connection_manager import get_weaviate_manager
 from core.infra.aws.bridge import AWSK8sBridge
 from core.infra.gcp.bridge import GCPK8sBridge
 from core.weaviate.cluster import get_backups, get_cluster_statistics, get_meta, get_nodes
-from core.weaviate.collections import delete_collection
 from core.weaviate.multitenancy import (
     check_multi_tenancy_status,
     get_tenants_activity_status,
@@ -236,6 +235,7 @@ class MainWindow(QMainWindow):
         self.sidebar.tool_requested.connect(self._open_tool_tab)
         self.sidebar.collection_action_requested.connect(self._on_collection_action_requested)
         self.sidebar.create_collection_requested.connect(self._open_create_collection_choice)
+        self.sidebar.delete_collections_requested.connect(self._open_delete_collections_dialog)
 
         splitter.addWidget(self.sidebar)
         splitter.addWidget(self.workspace)
@@ -1187,10 +1187,6 @@ class MainWindow(QMainWindow):
 
     def _on_collection_action_requested(self, collection_name: str, action_type: str) -> None:
         """Handle collection action from schema context menu."""
-        if action_type == "delete":
-            self._confirm_and_delete_collection(collection_name)
-            return
-
         if action_type == "read":
             self._open_collection_read_flow(collection_name)
             return
@@ -1200,24 +1196,15 @@ class MainWindow(QMainWindow):
 
             launch_search(collection_name, self.workspace, get_collection_schema, self)
 
-    def _confirm_and_delete_collection(self, collection_name: str) -> None:
-        result = QMessageBox.question(
-            self,
-            "Delete Collection",
-            f"Delete collection '{collection_name}' and all its data?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
+    def _open_delete_collections_dialog(self) -> None:
+        """Open the bulk-delete dialog from the sidebar ✕ button."""
+        from dialogs.delete_collections_dialog import DeleteCollectionsDialog
 
-        if result != QMessageBox.StandardButton.Yes:
-            return
-
-        success, message = delete_collection(collection_name)
-        if success:
-            QMessageBox.information(self, "Delete Collection", message)
+        names = self.sidebar.current_collection_names()
+        dialog = DeleteCollectionsDialog(names, self)
+        dialog.exec()
+        if dialog.deleted_any():
             self.sidebar.refresh_schema()
-        else:
-            QMessageBox.warning(self, "Delete Collection", message)
 
     def _open_collection_read_flow(self, collection_name: str) -> None:
         is_mt_enabled = self._is_multitenancy_enabled(collection_name)

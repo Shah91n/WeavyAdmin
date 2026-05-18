@@ -37,7 +37,7 @@ _DETACH_SIGNALS: tuple[str, ...] = (
     "object_found",
     "operation_success",
     # Ingest worker
-    "failed_objects",
+    "log_message",
     # Cluster profiling worker
     "log_line",
     "pod_started",

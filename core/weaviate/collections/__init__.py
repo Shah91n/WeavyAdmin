@@ -2,6 +2,7 @@ from core.weaviate.collections.aggregation import (
     aggregate_collections,
     aggregate_one_collection,
     aggregate_one_tenant,
+    get_total_objects_combined,
     list_collections_with_mt_status,
 )
 from core.weaviate.collections.batch import (
@@ -26,6 +27,7 @@ from core.weaviate.collections.create import create_collection
 from core.weaviate.collections.delete import delete_collection
 from core.weaviate.collections.update import (
     get_quantizer_config,
+    update_collections_replication,
     update_inverted_index_config,
     update_multi_tenancy_config,
     update_replication_config,
@@ -50,11 +52,13 @@ __all__ = [
     "get_mt_collections",
     "get_quantizer_config",
     "get_supported_vectorizers",
+    "get_total_objects_combined",
     "get_vector_config",
     "list_collections_with_mt_status",
     "map_row_to_properties",
     "parse_vector_value",
     "sanitize_property_name",
+    "update_collections_replication",
     "update_inverted_index_config",
     "update_multi_tenancy_config",
     "update_replication_config",

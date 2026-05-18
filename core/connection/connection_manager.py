@@ -125,6 +125,9 @@ class WeaviateConnectionManager:
                 "cluster_url": cluster_url,
                 "api_key": api_key,
                 "vectorizer_keys": vectorizer_keys or {},
+                "timeout_init": timeout_init,
+                "timeout_query": timeout_query,
+                "timeout_insert": timeout_insert,
             }
             logger.info(f"Connected to Weaviate Cloud: {cluster_url}")
             return True
@@ -179,6 +182,9 @@ class WeaviateConnectionManager:
                 "grpc_port": grpc_port,
                 "api_key": api_key,
                 "vectorizer_keys": vectorizer_keys or {},
+                "timeout_init": timeout_init,
+                "timeout_query": timeout_query,
+                "timeout_insert": timeout_insert,
             }
             logger.info(f"Connected to local Weaviate: localhost:{http_port}")
             return True
@@ -246,6 +252,9 @@ class WeaviateConnectionManager:
                 "secure": secure,
                 "api_key": api_key,
                 "vectorizer_keys": vectorizer_keys or {},
+                "timeout_init": timeout_init,
+                "timeout_query": timeout_query,
+                "timeout_insert": timeout_insert,
             }
             protocol = "https" if secure else "http"
             logger.info(f"Connected to custom Weaviate: {protocol}://{http_host}:{http_port}")

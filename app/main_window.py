@@ -47,6 +47,7 @@ from features.collections.create_view import CreateCollectionView
 from features.collections.update_config_view import UpdateCollectionConfigView
 from features.config.worker import ConfigurationWorker
 from features.config.wrapper_view import ConfigViewWrapper
+from features.dashboard.total_objects_worker import TotalObjectsWorker
 from features.dashboard.worker import DashboardWorker
 from features.diagnose.view import DiagnoseView
 from features.diagnose.worker import DiagnosticsWorker
@@ -99,6 +100,7 @@ class MainWindow(QMainWindow):
         self._toolbar_latency = None  # Latency label in toolbar
         self._toolbar_backup = None  # Backup backend badge in toolbar
         self._toolbar_namespace = None  # K8s namespace badge in toolbar
+        self._toolbar_timeouts = None  # Client Query/Insert timeout badge in toolbar
         self._status_connection_label = None  # "Connected to …" in bottom bar
 
         # Install the HTTP/gRPC request logger interceptor early
@@ -176,6 +178,11 @@ class MainWindow(QMainWindow):
         )
         self._toolbar_namespace.setVisible(True)
         self._toolbar.addWidget(self._toolbar_namespace)
+
+        self._toolbar_timeouts = QLabel()
+        self._toolbar_timeouts.setObjectName("toolbarBadge")
+        self._toolbar.addWidget(self._toolbar_timeouts)
+        self._update_timeouts_badge()
 
         # Push remaining buttons to the right
         spacer = QWidget()
@@ -280,6 +287,10 @@ class MainWindow(QMainWindow):
         # Launch dashboard worker (non-blocking)
         self._start_dashboard_worker()
 
+        # Launch the heavier Total Objects worker independently — it can take
+        # noticeable time on large clusters and should not gate the dashboard.
+        self._start_total_objects_worker()
+
         # Check whether any MT collections exist to enable the sidebar item
         self._start_mt_availability_worker()
 
@@ -362,6 +373,20 @@ class MainWindow(QMainWindow):
                     with contextlib.suppress(RuntimeError):
                         widget.cleanup()
 
+        # Orphan the Total Objects worker if it's still running — its signals
+        # reference dashboard widgets that disappear when the workspace is reset.
+        to_worker = getattr(self, "_total_objects_worker", None)
+        if to_worker is not None:
+            with contextlib.suppress(RuntimeError, TypeError):
+                to_worker.finished.disconnect()
+            with contextlib.suppress(RuntimeError, TypeError):
+                to_worker.error.disconnect()
+            if hasattr(to_worker, "isRunning") and to_worker.isRunning():
+                from app.workspace import _orphaned_tab_workers
+
+                _orphaned_tab_workers.append(to_worker)
+            self._total_objects_worker = None
+
         # Orphan any running config workers (disconnect their signals and keep
         # the Python reference alive until the OS thread finishes naturally).
         for worker in list(self.config_workers.values()):
@@ -400,6 +425,7 @@ class MainWindow(QMainWindow):
         self._toolbar_latency = None
         self._toolbar_backup = None
         self._toolbar_namespace = None
+        self._toolbar_timeouts = None
         self._status_connection_label = None
 
         # Clear the central widget (also destroys status bar and its children)
@@ -409,8 +435,8 @@ class MainWindow(QMainWindow):
         self._show_connection_dialog()
 
     def _on_connected(self) -> None:
-        """Build the main UI immediately, show splash, reveal window when both
-        the 2-second minimum and the first dashboard fetch are complete."""
+        """Build the main UI immediately, show splash, reveal window after a
+        fixed 2-second minimum. Dashboard data populates asynchronously."""
         splash_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             "res",
@@ -427,27 +453,13 @@ class MainWindow(QMainWindow):
         if self.isVisible():
             self.hide()
 
-        # Gate: both flags must be True before the splash closes.
-        self._splash_timer_done = False
-        self._splash_data_ready = False
-
         # Build UI and start workers NOW, while the window is still hidden.
         self._create_main_ui()
 
         self._splash.show()
-        QTimer.singleShot(2000, self._on_splash_timer_elapsed)
+        QTimer.singleShot(2000, self._close_splash)
 
-    def _on_splash_timer_elapsed(self) -> None:
-        self._splash_timer_done = True
-        self._try_close_splash()
-
-    def _on_splash_data_ready(self) -> None:
-        self._splash_data_ready = True
-        self._try_close_splash()
-
-    def _try_close_splash(self) -> None:
-        if not (self._splash_timer_done and self._splash_data_ready):
-            return
+    def _close_splash(self) -> None:
         if self._splash is not None:
             self._splash.close()
             self._splash = None
@@ -465,9 +477,10 @@ class MainWindow(QMainWindow):
 
     def _refresh_dashboard(self) -> None:
         """Re-fetch dashboard data (toolbar ↻ button)."""
-        if self._dashboard_worker is not None:
-            return  # already running
-        self._start_dashboard_worker()
+        if self._dashboard_worker is None:
+            self._start_dashboard_worker()
+        if getattr(self, "_total_objects_worker", None) is None:
+            self._start_total_objects_worker()
 
     def _on_dashboard_loaded(self, data: dict) -> None:
         self.workspace.dashboard_view.set_data(data)
@@ -477,7 +490,6 @@ class MainWindow(QMainWindow):
             self._dashboard_worker.error.disconnect()
             self._dashboard_worker.deleteLater()
             self._dashboard_worker = None
-        self._on_splash_data_ready()
 
     def _on_dashboard_error(self, message: str) -> None:
         self.workspace.dashboard_view.set_error(message)
@@ -486,7 +498,36 @@ class MainWindow(QMainWindow):
             self._dashboard_worker.error.disconnect()
             self._dashboard_worker.deleteLater()
             self._dashboard_worker = None
-        self._on_splash_data_ready()
+
+    # ------------------------------------------------------------------
+    # Total Objects worker — independent of the main dashboard fetch
+    # ------------------------------------------------------------------
+    def _start_total_objects_worker(self) -> None:
+        self._total_objects_worker = TotalObjectsWorker()
+        self._total_objects_worker.finished.connect(self._on_total_objects_loaded)
+        self._total_objects_worker.error.connect(self._on_total_objects_error)
+        self._total_objects_worker.start()
+
+    def _on_total_objects_loaded(self, total: int) -> None:
+        if hasattr(self, "workspace"):
+            self.workspace.dashboard_view.set_total_objects(total)
+        self._detach_total_objects_worker()
+
+    def _on_total_objects_error(self, message: str) -> None:
+        if hasattr(self, "workspace"):
+            self.workspace.dashboard_view.set_total_objects_error(message)
+        self._detach_total_objects_worker()
+
+    def _detach_total_objects_worker(self) -> None:
+        worker = getattr(self, "_total_objects_worker", None)
+        if worker is None:
+            return
+        with contextlib.suppress(RuntimeError, TypeError):
+            worker.finished.disconnect()
+        with contextlib.suppress(RuntimeError, TypeError):
+            worker.error.disconnect()
+        worker.deleteLater()
+        self._total_objects_worker = None
 
     # ------------------------------------------------------------------
     # MT availability check — runs once after connect
@@ -496,6 +537,29 @@ class MainWindow(QMainWindow):
         self._mt_availability_worker.finished.connect(self.sidebar.set_multitenancy_available)
         self._mt_availability_worker.error.connect(lambda _: None)  # silent fail
         self._mt_availability_worker.start()
+
+    def _update_timeouts_badge(self) -> None:
+        """Populate the toolbar badge that shows the active client Query/Insert timeouts.
+
+        Init timeout is omitted intentionally — it only applies during the initial
+        handshake, which is already complete by the time the toolbar is visible.
+        """
+        if self._toolbar_timeouts is None:
+            return
+        params = self.manager.get_connection_info().get("params", {}) or {}
+        query_to = params.get("timeout_query")
+        insert_to = params.get("timeout_insert")
+        init_to = params.get("timeout_init")
+        if query_to is None and insert_to is None:
+            self._toolbar_timeouts.setVisible(False)
+            return
+        self._toolbar_timeouts.setText(f"⏱ Q:{query_to}s · I:{insert_to}s")
+        self._toolbar_timeouts.setToolTip(
+            "Active Weaviate client timeouts for this connection.\n"
+            f"Query: {query_to}s  ·  Insert: {insert_to}s  ·  Init: {init_to}s\n"
+            "Change these in the connection dialog's Timeout Settings tab before reconnecting."
+        )
+        self._toolbar_timeouts.setVisible(True)
 
     def _update_toolbar_metrics(self, data: dict) -> None:
         """Populate the top toolbar with live metrics from the dashboard worker result."""

@@ -100,6 +100,35 @@ def update_replication_config(
         return False, f"Failed to update replication config: {str(e)}"
 
 
+def update_collections_replication(
+    collection_names: list[str],
+    async_enabled: bool | None = None,
+    deletion_strategy: Any | None = None,
+) -> dict:
+    """Bulk-apply a replication config change to a set of collections.
+
+    Returns a dict ``{"successful": [str], "failed": [(name, error)]}``. The
+    operation does not abort on individual failures — every collection is
+    attempted independently so a partial fix is still useful.
+    """
+    successful: list[str] = []
+    failed: list[tuple[str, str]] = []
+    deletion_strategy = _coerce_enum(deletion_strategy, ReplicationDeletionStrategy)
+
+    for name in collection_names:
+        ok, msg = update_replication_config(
+            name,
+            async_enabled=async_enabled,
+            deletion_strategy=deletion_strategy,
+        )
+        if ok:
+            successful.append(name)
+        else:
+            failed.append((name, msg))
+
+    return {"successful": successful, "failed": failed}
+
+
 def get_quantizer_config(
     quantizer_type: str | None, quantizer_kwargs: dict[str, Any] | None
 ) -> Any:

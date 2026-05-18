@@ -2,14 +2,12 @@
 Diagnose View – Cluster Health & Schema Diagnostics Report.
 
 Displays:
-  1. Cluster Health Check      – per-check status rows (liveness, readiness, nodes,
-                                  version consistency, Raft sync, maintenance, empty cluster)
-  2. Shard Consistency Check
-  3. Collection Count Analysis
-  4. Summary metrics (total collections, compression issues, replication issues)
-  5. Compression Configuration Summary
-  6. Replication Configuration Summary
-  7. Detailed Per-Collection Diagnostics (collapsible, filterable)
+  1. Cluster Health Check      – compact horizontal cards (one per check)
+  2. Shard Consistency Check   – table + bulk "Set Shards to READY" action
+  3. Schema                    – collection count analysis, compression warnings
+                                  (click-to-expand list), replication issues
+                                  (click-to-expand list + bulk "Apply
+                                  Recommended Fix" action)
 """
 
 import contextlib
@@ -17,8 +15,8 @@ import logging
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -30,13 +28,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from weaviate.classes.config import ReplicationDeletionStrategy
 
 from core.weaviate.schema import get_all_shards, update_shards_status
+from features.diagnose.fix_replication_worker import FixReplicationWorker
 from features.shards.worker import UpdateShardsStatusWorker
-from shared.styles.global_qss import (
-    COLOR_ACCENT_GREEN,
-    COLOR_ERROR,
-)
 from shared.worker_mixin import WorkerMixin, _orphan_worker
 
 logger = logging.getLogger(__name__)
@@ -46,39 +42,33 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class _DiagCard(QFrame):
-    """Metric summary card."""
+class _HealthCard(QFrame):
+    """Compact card for a single cluster-health check."""
 
-    def __init__(self, title: str, value: str = "–", parent=None):
+    def __init__(self, title: str, status_text: str, level: str, parent=None):
         super().__init__(parent)
-        self.setObjectName("diagCard")
+        resolved_level = level if level in {"success", "warning", "error", "info"} else "info"
+        self.setObjectName("diagHealthCard")
+        self.setProperty("level", resolved_level)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
 
-        self._title = QLabel(title)
-        self._title.setObjectName("diagCardTitle")
-        layout.addWidget(self._title)
+        title_lbl = QLabel(title)
+        title_lbl.setObjectName("diagHealthCardTitle")
+        layout.addWidget(title_lbl)
 
-        self._value = QLabel(str(value))
-        self._value.setObjectName("diagCardValue")
-        self._value.setProperty("tone", "default")
-        layout.addWidget(self._value)
-
-    def set_value(self, text: str, color: str | None = None):
-        self._value.setText(str(text))
-        tone = "default"
-        if color == COLOR_ACCENT_GREEN:
-            tone = "success"
-        elif color == COLOR_ERROR:
-            tone = "error"
-        self._value.setProperty("tone", tone)
-        self._value.style().unpolish(self._value)
-        self._value.style().polish(self._value)
+        value_lbl = QLabel(status_text)
+        value_lbl.setObjectName("diagHealthCardValue")
+        value_lbl.setProperty("level", resolved_level)
+        value_lbl.setWordWrap(True)
+        value_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(value_lbl)
 
 
 class _StatusBanner(QFrame):
-    """Coloured one-line status banner (success / warning / error)."""
+    """Coloured one-line status banner (success / warning / error / info)."""
 
     def __init__(self, text: str, level: str = "info", parent=None):
         super().__init__(parent)
@@ -95,7 +85,7 @@ class _StatusBanner(QFrame):
 
 
 class _CollapsibleSection(QFrame):
-    """A collapsible section with a clickable header."""
+    """A collapsible section with a clickable header — collapsed by default."""
 
     def __init__(self, title: str, status_icon: str = "", expanded: bool = False, parent=None):
         super().__init__(parent)
@@ -105,14 +95,12 @@ class _CollapsibleSection(QFrame):
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._outer.setSpacing(0)
 
-        # Header button
         self._toggle_btn = QPushButton(f"  {status_icon}  {title}")
         self._toggle_btn.setObjectName("summaryToggle")
         self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._toggle_btn.clicked.connect(self._toggle)
         self._outer.addWidget(self._toggle_btn)
 
-        # Body container
         self._body = QWidget()
         self._body_layout = QVBoxLayout(self._body)
         self._body_layout.setContentsMargins(16, 4, 16, 12)
@@ -120,6 +108,7 @@ class _CollapsibleSection(QFrame):
         self._outer.addWidget(self._body)
         self._body.setVisible(expanded)
 
+        self._title = title
         self._expanded = expanded
         self._update_arrow()
 
@@ -134,22 +123,10 @@ class _CollapsibleSection(QFrame):
 
     def _update_arrow(self):
         text = self._toggle_btn.text()
-        # Remove existing arrow (first two chars if any)
         if text.startswith("▶") or text.startswith("▼"):
             text = text[1:]
         arrow = "▼" if self._expanded else "▶"
         self._toggle_btn.setText(f"{arrow}{text}")
-
-
-# ---------------------------------------------------------------------------
-# Separator
-# ---------------------------------------------------------------------------
-def _separator():
-    line = QFrame()
-    line.setObjectName("diagSeparator")
-    line.setFrameShape(QFrame.Shape.HLine)
-    line.setFixedHeight(1)
-    return line
 
 
 def _section_title(text: str) -> QLabel:
@@ -166,30 +143,32 @@ class DiagnoseView(QWidget, WorkerMixin):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._readonly_shards_for_action = []
-        self._set_ready_worker = None
-        self._set_ready_button = None
-        self._shard_section_container = None
-        self._shard_section_layout = None
+        self._readonly_shards_for_action: list[dict] = []
+        self._set_ready_worker: UpdateShardsStatusWorker | None = None
+        self._set_ready_button: QPushButton | None = None
+        self._shard_section_container: QWidget | None = None
+        self._shard_section_layout: QVBoxLayout | None = None
+        self._fix_replication_worker: FixReplicationWorker | None = None
+        self._fix_replication_button: QPushButton | None = None
+        self._replication_issue_collections: list[str] = []
         self._build_ui()
 
-    def _build_ui(self):
+    def _build_ui(self) -> None:
         scroll = QScrollArea()
         scroll.setObjectName("diagScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
 
         self._content = QWidget()
+        self._content.setObjectName("diagContent")
         self._root = QVBoxLayout(self._content)
         self._root.setContentsMargins(24, 20, 24, 20)
         self._root.setSpacing(14)
 
-        # Title
         title = QLabel("🔍  Schema Diagnostics Report")
         title.setObjectName("diagViewTitle")
         self._root.addWidget(title)
 
-        # Loading
         self._loading_label = QLabel("Running comprehensive schema diagnostics…")
         self._loading_label.setObjectName("diagLoadingLabel")
         self._root.addWidget(self._loading_label)
@@ -204,17 +183,16 @@ class DiagnoseView(QWidget, WorkerMixin):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def set_loading(self):
+    def set_loading(self) -> None:
         self._loading_label.setVisible(True)
 
-    def set_error(self, msg: str):
+    def set_error(self, msg: str) -> None:
         self._loading_label.setVisible(False)
         self._root.insertWidget(1, _StatusBanner(f"Error: {msg}", "error"))
 
-    def set_data(self, data: dict):
+    def set_data(self, data: dict) -> None:
         """Populate the view from the dict emitted by DiagnosticsWorker."""
         self._loading_label.setVisible(False)
-        # Remove stretch
         self._remove_stretch()
 
         diag = data.get("diagnostics", {})
@@ -223,45 +201,16 @@ class DiagnoseView(QWidget, WorkerMixin):
             self._root.addStretch()
             return
 
-        # 1. Cluster health checks
         self._render_cluster_health(data.get("health", {}))
-
-        # 2. Shard consistency
         self._render_shard_consistency(data)
-
-        # 3. Collection count analysis
-        self._render_collection_count(diag)
-
-        # 4. Summary metric cards
-        self._render_summary_cards(diag)
-
-        # 5. Compression summary
-        self._render_compression_summary(diag)
-
-        # 6. Replication summary
-        self._render_replication_summary(diag)
-
-        # 7. Detailed per-collection diagnostics
-        self._render_detailed_diagnostics(diag)
-
-        # Footer
-        self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("✅  Diagnostics Complete"))
-        tip = QLabel(
-            "💡  Review any critical or warning issues above and consider applying the recommended configurations."
-        )
-        tip.setWordWrap(True)
-        tip.setObjectName("diagSmallTip")
-        self._root.addWidget(tip)
+        self._render_schema_section(diag)
 
         self._root.addStretch()
 
     # ------------------------------------------------------------------
-    # Render helpers
+    # Cluster health
     # ------------------------------------------------------------------
-
     def _render_cluster_health(self, health: dict) -> None:
-        self._root.addWidget(_separator())
         self._root.addWidget(_section_title("🏥  Cluster Health Check"))
 
         if health.get("error"):
@@ -275,91 +224,75 @@ class DiagnoseView(QWidget, WorkerMixin):
         nodes = health.get("nodes", [])
         active_nodes = health.get("active_nodes", 0)
         cluster_synchronized = health.get("cluster_synchronized")
-        total_collections = health.get("total_collections", -1)
 
-        checks: list[tuple[str, str, str]] = []  # (icon, message, level)
+        checks: list[tuple[str, str, str]] = []
 
-        # 1. Liveness
-        if is_live:
-            checks.append(("✅", "Liveness — cluster is reachable", "success"))
-        else:
-            checks.append(("❌", "Liveness — cluster is offline or unreachable", "error"))
+        checks.append(
+            ("Liveness", "Reachable", "success")
+            if is_live
+            else ("Liveness", "Offline / unreachable", "error")
+        )
 
-        # 2. Readiness
         if is_ready:
-            checks.append(("✅", "Readiness — cluster is fully ready", "success"))
+            checks.append(("Readiness", "Fully ready", "success"))
         elif is_live:
-            checks.append(("⚠️", "Readiness — cluster is live but not fully ready", "warning"))
+            checks.append(("Readiness", "Live but not ready", "warning"))
         else:
-            checks.append(("❌", "Readiness — cannot determine (cluster offline)", "error"))
+            checks.append(("Readiness", "Cluster offline", "error"))
 
-        # 3. Active nodes
         if active_nodes > 0:
-            checks.append(("✅", f"Active nodes — {active_nodes} node(s) detected", "success"))
+            checks.append(("Active Nodes", f"{active_nodes} node(s)", "success"))
         else:
-            checks.append(("❌", "Active nodes — no nodes detected in the cluster", "error"))
+            checks.append(("Active Nodes", "No nodes detected", "error"))
 
-        # 4. Node health (summary if all OK, one row per unhealthy node otherwise)
         unhealthy = [n for n in nodes if "HEALTHY" not in n.get("status", "HEALTHY").upper()]
         if not unhealthy:
-            checks.append(("✅", "Node health — all nodes are healthy", "success"))
+            checks.append(("Node Health", "All healthy", "success"))
         else:
-            for node in unhealthy:
-                checks.append(
-                    ("⚠️", f"Node health — '{node.get('name', '?')}' is not healthy", "warning")
-                )
+            names = ", ".join(n.get("name", "?") for n in unhealthy)
+            checks.append(("Node Health", f"{len(unhealthy)} unhealthy: {names}", "warning"))
 
-        # 5. Version consistency
         versions = {n.get("version") for n in nodes if n.get("version")}
         if len(versions) > 1:
             checks.append(
-                ("⚠️", f"Version consistency — mismatch: {', '.join(sorted(versions))}", "warning")
+                ("Version Consistency", f"Mismatch: {', '.join(sorted(versions))}", "warning")
             )
         elif versions:
-            checks.append(
-                ("✅", f"Version consistency — all nodes on {next(iter(versions))}", "success")
-            )
+            checks.append(("Version Consistency", f"All on {next(iter(versions))}", "success"))
         else:
-            checks.append(("ℹ️", "Version consistency — version data unavailable", "info"))
+            checks.append(("Version Consistency", "Data unavailable", "info"))
 
-        # 6. Raft synchronization
         if cluster_synchronized is None:
-            checks.append(("ℹ️", "Raft synchronization — statistics endpoint unavailable", "info"))
+            checks.append(("Raft Sync", "Statistics unavailable", "info"))
         elif cluster_synchronized:
-            checks.append(("✅", "Raft synchronization — all nodes in sync", "success"))
+            checks.append(("Raft Sync", "All nodes in sync", "success"))
         else:
-            checks.append(
-                ("⚠️", "Raft synchronization — applied index mismatch detected", "warning")
-            )
+            checks.append(("Raft Sync", "Applied index mismatch", "warning"))
 
-        # 7. Maintenance mode
         maintenance = [
             n for n in nodes if "maintenance" in (n.get("operational_mode") or "").lower()
         ]
         if not maintenance:
-            checks.append(("✅", "Maintenance mode — no nodes in maintenance", "success"))
+            checks.append(("Maintenance", "None", "success"))
         else:
-            for node in maintenance:
-                checks.append(
-                    ("ℹ️", f"Maintenance mode — '{node.get('name', '?')}' is in maintenance", "info")
-                )
+            names = ", ".join(n.get("name", "?") for n in maintenance)
+            checks.append(("Maintenance", f"{len(maintenance)} in maintenance: {names}", "info"))
 
-        # 8. Empty cluster
-        if total_collections == 0 and is_live:
-            checks.append(("ℹ️", "Empty cluster — no collections found", "info"))
-        elif total_collections > 0:
-            checks.append(
-                ("✅", f"Empty cluster — {total_collections} collection(s) present", "success")
-            )
-        else:
-            checks.append(("ℹ️", "Empty cluster — collection count unavailable", "info"))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(10)
+        cols = 4
+        for idx, (title, status_text, level) in enumerate(checks):
+            grid.addWidget(_HealthCard(title, status_text, level), idx // cols, idx % cols)
+        for c in range(cols):
+            grid.setColumnStretch(c, 1)
+        self._root.addLayout(grid)
 
-        for icon, message, level in checks:
-            self._root.addWidget(_StatusBanner(f"{icon}  {message}", level))
-
-    def _render_shard_consistency(self, data: dict):
-        self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("Shard Consistency Check"))
+    # ------------------------------------------------------------------
+    # Shard consistency
+    # ------------------------------------------------------------------
+    def _render_shard_consistency(self, data: dict) -> None:
+        self._root.addWidget(_section_title("🗂  Shard Consistency Check"))
 
         self._shard_section_container = QWidget()
         self._shard_section_layout = QVBoxLayout(self._shard_section_container)
@@ -374,7 +307,7 @@ class DiagnoseView(QWidget, WorkerMixin):
         inconsistent = data.get("inconsistent_shards")
         self._render_shard_section_content(shard_info_available=True, inconsistent=inconsistent)
 
-    def _render_shard_section_content(self, shard_info_available: bool, inconsistent):
+    def _render_shard_section_content(self, shard_info_available: bool, inconsistent) -> None:
         if self._shard_section_layout is None:
             return
 
@@ -439,192 +372,140 @@ class DiagnoseView(QWidget, WorkerMixin):
         table.setSortingEnabled(True)
         return table
 
-    def _render_collection_count(self, diag: dict):
-        self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("📊  Collection Count Analysis"))
+    # ------------------------------------------------------------------
+    # Schema section (collection count, replication, compression)
+    # ------------------------------------------------------------------
+    def _render_schema_section(self, diag: dict) -> None:
+        self._root.addWidget(_section_title("📑  Schema"))
 
+        # — Collection count analysis (no subheader — the banner is self-explanatory) —
         status = diag.get("collection_count_status", "ok")
         msg = diag.get("collection_count_message", "")
         level = {"ok": "success", "warning": "warning", "critical": "error"}.get(status, "info")
         self._root.addWidget(_StatusBanner(msg, level))
 
-    def _render_summary_cards(self, diag: dict):
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        # — Replication first (more severe than compression) —
+        sub = QLabel("🔁  Replication Issues")
+        sub.setObjectName("diagSchemaSubHeader")
+        self._root.addWidget(sub)
+        self._render_replication_block(diag.get("replication_issues", []))
 
-        card_total = _DiagCard("Total Collections")
-        card_total.set_value(str(diag.get("collection_count", 0)))
-        cards_layout.addWidget(card_total)
+        # — Compression second —
+        sub = QLabel("🗜️  Compression Warnings")
+        sub.setObjectName("diagSchemaSubHeader")
+        self._root.addWidget(sub)
+        self._render_compression_block(diag.get("compression_issues", []))
 
-        comp_count = len(diag.get("compression_issues", []))
-        card_comp = _DiagCard("Compression Issues")
-        card_comp.set_value(str(comp_count), COLOR_ERROR if comp_count else COLOR_ACCENT_GREEN)
-        cards_layout.addWidget(card_comp)
-
-        rep_count = len(diag.get("replication_issues", []))
-        card_rep = _DiagCard("Replication Issues")
-        card_rep.set_value(str(rep_count), COLOR_ERROR if rep_count else COLOR_ACCENT_GREEN)
-        cards_layout.addWidget(card_rep)
-
-        self._root.addLayout(cards_layout)
-
-    def _render_compression_summary(self, diag: dict):
-        self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("🗜️  Compression Configuration Summary"))
-
-        issues = diag.get("compression_issues", [])
-        if issues:
+    def _render_compression_block(self, issues: list[str]) -> None:
+        if not issues:
             self._root.addWidget(
-                _StatusBanner(
-                    f"⚠️  Found {len(issues)} collection(s) without compression enabled", "warning"
-                )
+                _StatusBanner("✅  All collections have compression configured", "success")
             )
-            section = _CollapsibleSection("Collections without compression", expanded=False)
-            for issue in issues:
-                lbl = QLabel(f"  •  {issue}")
-                lbl.setWordWrap(True)
-                lbl.setObjectName("diagDetailText")
-                section.body_layout.addWidget(lbl)
-            tip = QLabel(
-                "💡  Recommendation: Enable PQ, BQ, or SQ compression for better memory management"
-            )
-            tip.setWordWrap(True)
-            tip.setObjectName("diagItalicTip")
-            section.body_layout.addWidget(tip)
-            self._root.addWidget(section)
-        else:
-            self._root.addWidget(
-                _StatusBanner("✅  All collections have compression properly configured", "success")
-            )
-
-    def _render_replication_summary(self, diag: dict):
-        self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("Replication Configuration Summary"))
-
-        issues = diag.get("replication_issues", [])
-        if issues:
-            self._root.addWidget(
-                _StatusBanner(
-                    f"🔴  Found {len(issues)} collection(s) with replication issues", "error"
-                )
-            )
-            section = _CollapsibleSection("Collections with replication issues", expanded=False)
-            for issue in issues:
-                lbl = QLabel(f"  •  {issue}")
-                lbl.setWordWrap(True)
-                lbl.setObjectName("diagDetailText")
-                section.body_layout.addWidget(lbl)
-            rec = QLabel(
-                "💡  Recommendations:\n"
-                "   • Set asyncEnabled to true for better consistency\n"
-                "   • Use TimeBasedResolution or DeleteOnConflict for deletion strategy\n"
-                "   • Use odd replication factors (3, 5, 7) for optimal RAFT consensus"
-            )
-            rec.setWordWrap(True)
-            rec.setObjectName("diagItalicTip")
-            section.body_layout.addWidget(rec)
-            self._root.addWidget(section)
-        else:
-            self._root.addWidget(
-                _StatusBanner("✅  All collections have replication properly configured", "success")
-            )
-
-    # ------------------------------------------------------------------
-    # Detailed per-collection
-    # ------------------------------------------------------------------
-    def _render_detailed_diagnostics(self, diag: dict):
-        self._root.addWidget(_separator())
-        self._root.addWidget(_section_title("📑  Detailed Collection Diagnostics"))
-
-        all_checks = diag.get("all_checks", [])
-        if not all_checks:
-            self._root.addWidget(_StatusBanner("No collections to diagnose", "info"))
             return
 
-        # Filter combo
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(8)
-        filter_label = QLabel("Filter:")
-        filter_label.setObjectName("diagFilterLabel")
-        filter_row.addWidget(filter_label)
-
-        self._filter_combo = QComboBox()
-        self._filter_combo.setObjectName("diagFilterCombo")
-        self._filter_combo.addItems(
-            [
-                "All Collections",
-                "Critical Issues",
-                "Warning Issues",
-            ]
+        self._root.addWidget(
+            _StatusBanner(
+                f"⚠️  {len(issues)} collection(s) without compression — for better memory "
+                "management, enable a quantization method. Weaviate recommends RQ (Rotational "
+                "Quantization); PQ, BQ, or SQ are also valid.",
+                "warning",
+            )
         )
-        filter_row.addWidget(self._filter_combo)
-        filter_row.addStretch()
-        self._root.addLayout(filter_row)
 
-        # Container for collection sections
-        self._checks_container = QWidget()
-        self._checks_layout = QVBoxLayout(self._checks_container)
-        self._checks_layout.setContentsMargins(0, 0, 0, 0)
-        self._checks_layout.setSpacing(8)
-        self._root.addWidget(self._checks_container)
+        names = self._extract_collection_names(issues)
+        section = _CollapsibleSection(f"Show affected collections ({len(names)})", expanded=False)
+        section.body_layout.addWidget(self._build_scrollable_list([f"•  {n}" for n in names]))
+        self._root.addWidget(section)
 
-        self._all_checks = all_checks
-        self._collection_widgets: list[tuple[str, str, str, _CollapsibleSection]] = []
+    def _render_replication_block(self, issues: list[str]) -> None:
+        self._replication_issue_collections = []
+        self._fix_replication_button = None
 
-        for check in all_checks:
-            name = check["collection"]
-            comp_status = check["compression"]["status"]
-            rep_status = check["replication"]["status"]
+        if not issues:
+            self._root.addWidget(
+                _StatusBanner("✅  All collections have replication configured", "success")
+            )
+            return
 
-            # Status icon
-            if comp_status == "critical" or rep_status == "critical":
-                icon = "🔴"
-            elif comp_status == "warning" or rep_status == "warning":
-                icon = "⚠️"
-            else:
-                icon = "✅"
+        self._root.addWidget(
+            _StatusBanner(
+                f"🔴  {len(issues)} collection(s) with replication issues — "
+                "replication issues can cause inconsistency. Recommended fix: enable async "
+                "replication and set deletion strategy to TimeBasedResolution. Odd replication "
+                "factors (3, 5, 7) work best for RAFT consensus.",
+                "error",
+            )
+        )
 
-            section = _CollapsibleSection(name, icon, expanded=False)
+        names = self._extract_collection_names(issues)
+        self._replication_issue_collections = names
 
-            # Compression details
-            comp_hdr = QLabel("Compression Configuration")
-            comp_hdr.setObjectName("diagSubHeader")
-            section.body_layout.addWidget(comp_hdr)
-            for detail in check["compression"]["details"]:
-                lbl = QLabel(f"   {detail}")
-                lbl.setWordWrap(True)
-                lbl.setObjectName("diagDetailText")
-                section.body_layout.addWidget(lbl)
+        action_row = QHBoxLayout()
+        self._fix_replication_button = QPushButton("🛠  Apply Recommended Fix")
+        self._fix_replication_button.setObjectName("diagFixReplicationButton")
+        self._fix_replication_button.setToolTip(
+            "Set async_enabled=True and deletion_strategy=TimeBasedResolution on every "
+            "affected collection listed below."
+        )
+        self._fix_replication_button.clicked.connect(self._on_fix_replication_clicked)
+        action_row.addWidget(self._fix_replication_button)
+        action_row.addStretch()
+        action_widget = QWidget()
+        action_widget.setLayout(action_row)
+        self._root.addWidget(action_widget)
 
-            # Replication details
-            rep_hdr = QLabel("Replication Configuration")
-            rep_hdr.setObjectName("diagSubHeader")
-            section.body_layout.addWidget(rep_hdr)
-            for detail in check["replication"]["details"]:
-                lbl = QLabel(f"   {detail}")
-                lbl.setWordWrap(True)
-                lbl.setObjectName("diagDetailText")
-                section.body_layout.addWidget(lbl)
+        section = _CollapsibleSection(f"Show affected collections ({len(issues)})", expanded=False)
+        # "{name}: {summary}" → "{name} — {summary}" for readability.
+        items = [f"•  {issue.replace(':', ' —', 1)}" for issue in issues]
+        section.body_layout.addWidget(self._build_scrollable_list(items))
+        self._root.addWidget(section)
 
-            self._checks_layout.addWidget(section)
-            self._collection_widgets.append((name, comp_status, rep_status, section))
+    def _build_scrollable_list(self, lines: list[str]) -> QScrollArea:
+        """Render a fixed-height, scrollable list of plain-text lines.
 
-        # Connect filter
-        self._filter_combo.currentTextChanged.connect(self._apply_filter)
+        Used inside collapsible sections so a huge cluster's affected-collection
+        list stays at a sane fixed size instead of blowing up the page scroll.
+        """
+        inner = QWidget()
+        inner.setObjectName("diagScrollListInner")
+        inner_layout = QVBoxLayout(inner)
+        inner_layout.setContentsMargins(8, 4, 8, 4)
+        inner_layout.setSpacing(2)
+        for line in lines:
+            lbl = QLabel(line)
+            lbl.setObjectName("diagListItem")
+            lbl.setWordWrap(True)
+            lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            inner_layout.addWidget(lbl)
+        inner_layout.addStretch()
 
-    def _apply_filter(self, filter_text: str):
-        for _name, comp_status, rep_status, widget in self._collection_widgets:
-            show = False
-            if filter_text == "All Collections":
-                show = True
-            elif filter_text == "Critical Issues":
-                show = comp_status == "critical" or rep_status == "critical"
-            elif filter_text == "Warning Issues":
-                has_warning = comp_status == "warning" or rep_status == "warning"
-                has_critical = comp_status == "critical" or rep_status == "critical"
-                show = has_warning and not has_critical
-            widget.setVisible(show)
+        scroll = QScrollArea()
+        scroll.setObjectName("diagScrollList")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(inner)
+        scroll.setFixedHeight(220)
+        return scroll
 
+    @staticmethod
+    def _extract_collection_names(issues: list[str]) -> list[str]:
+        """Pull collection names from the ``"{name}: {summary}"`` strings.
+
+        Weaviate collection names are PascalCase identifiers with no colons, so
+        splitting on the first ``":"`` is safe.
+        """
+        names: list[str] = []
+        seen: set[str] = set()
+        for issue in issues:
+            name = issue.split(":", 1)[0].strip()
+            if name and name not in seen:
+                seen.add(name)
+                names.append(name)
+        return names
+
+    # ------------------------------------------------------------------
+    # Shard READY action
+    # ------------------------------------------------------------------
     def _extract_readonly_shards(self, rows: list[dict]) -> list[dict]:
         readonly = []
         seen = set()
@@ -638,15 +519,10 @@ class DiagnoseView(QWidget, WorkerMixin):
             if not collection or not shard_name or key in seen:
                 continue
             seen.add(key)
-            readonly.append(
-                {
-                    "collection": collection,
-                    "shard_name": shard_name,
-                }
-            )
+            readonly.append({"collection": collection, "shard_name": shard_name})
         return readonly
 
-    def _on_set_readonly_shards_clicked(self):
+    def _on_set_readonly_shards_clicked(self) -> None:
         if not self._readonly_shards_for_action:
             QMessageBox.information(
                 self, "Set Shards to READY", "No READONLY shards found to update."
@@ -686,7 +562,7 @@ class DiagnoseView(QWidget, WorkerMixin):
         self._set_ready_worker.error.connect(self._on_set_ready_error)
         self._set_ready_worker.start()
 
-    def _on_set_ready_finished(self, result: dict):
+    def _on_set_ready_finished(self, result: dict) -> None:
         if self._set_ready_worker is not None:
             self._set_ready_worker.finished.disconnect()
             self._set_ready_worker.error.disconnect()
@@ -717,7 +593,7 @@ class DiagnoseView(QWidget, WorkerMixin):
 
         self._refresh_shard_consistency_after_action()
 
-    def _on_set_ready_error(self, error_msg: str):
+    def _on_set_ready_error(self, error_msg: str) -> None:
         if self._set_ready_worker is not None:
             self._set_ready_worker.finished.disconnect()
             self._set_ready_worker.error.disconnect()
@@ -730,7 +606,102 @@ class DiagnoseView(QWidget, WorkerMixin):
 
         QMessageBox.critical(self, "Error", f"Failed to set shards to READY:\n{error_msg}")
 
-    def _refresh_shard_consistency_after_action(self):
+    # ------------------------------------------------------------------
+    # Fix Replication action
+    # ------------------------------------------------------------------
+    def _on_fix_replication_clicked(self) -> None:
+        names = list(self._replication_issue_collections)
+        if not names:
+            QMessageBox.information(
+                self, "Apply Recommended Fix", "No replication issues found to fix."
+            )
+            return
+
+        preview = ", ".join(names[:5]) + (f", … (+{len(names) - 5} more)" if len(names) > 5 else "")
+        result = QMessageBox.question(
+            self,
+            "Apply Recommended Replication Fix",
+            (
+                f"Apply async_enabled=True and deletion_strategy=TimeBasedResolution "
+                f"to {len(names)} collection(s)?\n\n{preview}"
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        if self._fix_replication_button is not None:
+            self._fix_replication_button.setEnabled(False)
+            self._fix_replication_button.setText("Applying replication fix…")
+
+        if self._fix_replication_worker is not None:
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.finished.disconnect()
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.error.disconnect()
+            if self._fix_replication_worker.isRunning():
+                _orphan_worker(self._fix_replication_worker)
+            else:
+                self._fix_replication_worker.deleteLater()
+            self._fix_replication_worker = None
+
+        self._fix_replication_worker = FixReplicationWorker(
+            names,
+            async_enabled=True,
+            deletion_strategy=ReplicationDeletionStrategy.TIME_BASED_RESOLUTION,
+        )
+        self._fix_replication_worker.finished.connect(self._on_fix_replication_finished)
+        self._fix_replication_worker.error.connect(self._on_fix_replication_error)
+        self._fix_replication_worker.start()
+
+    def _on_fix_replication_finished(self, result: dict) -> None:
+        if self._fix_replication_worker is not None:
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.finished.disconnect()
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.error.disconnect()
+            self._fix_replication_worker.deleteLater()
+        self._fix_replication_worker = None
+
+        if self._fix_replication_button is not None:
+            self._fix_replication_button.setText("🛠  Apply Recommended Fix")
+            self._fix_replication_button.setEnabled(True)
+
+        successful = result.get("successful", [])
+        failed = result.get("failed", [])
+
+        if not failed:
+            QMessageBox.information(
+                self,
+                "Apply Recommended Fix",
+                f"Replication updated on {len(successful)} collection(s).\n\n"
+                "Re-open the Diagnose tab to verify the new configuration.",
+            )
+        else:
+            details = "\n".join(f"  - {name}: {err}" for name, err in failed)
+            QMessageBox.warning(
+                self,
+                "Apply Recommended Fix",
+                f"Successful: {len(successful)}  ·  Failed: {len(failed)}\n\nErrors:\n{details}",
+            )
+
+    def _on_fix_replication_error(self, error_msg: str) -> None:
+        if self._fix_replication_worker is not None:
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.finished.disconnect()
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.error.disconnect()
+            self._fix_replication_worker.deleteLater()
+        self._fix_replication_worker = None
+
+        if self._fix_replication_button is not None:
+            self._fix_replication_button.setText("🛠  Apply Recommended Fix")
+            self._fix_replication_button.setEnabled(True)
+
+        QMessageBox.critical(self, "Error", f"Replication fix failed:\n{error_msg}")
+
+    def _refresh_shard_consistency_after_action(self) -> None:
         try:
             all_shards = get_all_shards()
             readonly = [s for s in all_shards if "READONLY" in str(s.get("status", "")).upper()]
@@ -772,12 +743,21 @@ class DiagnoseView(QWidget, WorkerMixin):
             else:
                 self._set_ready_worker.deleteLater()
             self._set_ready_worker = None
+        if self._fix_replication_worker is not None:
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.finished.disconnect()
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_worker.error.disconnect()
+            if self._fix_replication_worker.isRunning():
+                _orphan_worker(self._fix_replication_worker)
+            else:
+                self._fix_replication_worker.deleteLater()
+            self._fix_replication_worker = None
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
-    def _remove_stretch(self):
-        """Remove trailing stretch items from root layout."""
+    def _remove_stretch(self) -> None:
         for i in range(self._root.count() - 1, -1, -1):
             item = self._root.itemAt(i)
             if item and item.spacerItem():

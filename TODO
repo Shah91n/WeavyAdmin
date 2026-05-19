@@ -1,7 +1,6 @@
 [] Add update-available indicator in main UI (highlight key feature when a new version exists)
 [] Add UI in STS to add/remove environments
 [] Implement live monitoring dashboard
-
 [] Add loading bar for LB or Logs to show progress when fetching
 [] DeDup GoRoutines in the Profiling
 [] Pod Logs filtering

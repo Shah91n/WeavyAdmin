@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -125,10 +126,6 @@ class LogView(QWidget, WorkerMixin):
         self._build_ui()
         _state.namespace_changed.connect(self.set_namespace)
 
-        # Auto-fetch on open when namespace is already known
-        if self._namespace:
-            self.get_logs()
-
     def cleanup(self) -> None:
         import contextlib
 
@@ -144,7 +141,11 @@ class LogView(QWidget, WorkerMixin):
     def set_namespace(self, namespace: str) -> None:
         """Change the target namespace and refresh the status label."""
         self._namespace = namespace
-        self._update_status(f"Namespace: {namespace}" if namespace else "No namespace configured.")
+        self._update_status(
+            f"Namespace: {namespace} — click 'Get Logs' to fetch."
+            if namespace
+            else "No namespace configured."
+        )
 
     def get_logs(self) -> None:
         """Fetch the latest logs from the configured namespace."""
@@ -211,15 +212,19 @@ class LogView(QWidget, WorkerMixin):
 
         self._type_combo = QComboBox()
         self._type_combo.setObjectName("infraFilterCombo")
-        self._type_combo.addItems(["Message", "Action", "User", "Method"])
+        self._type_combo.addItems(["Message", "Action", "User", "Method", "Pod"])
         self._type_combo.setFixedWidth(100)
+        self._type_combo.setToolTip(
+            "Field the Search box matches against.\n"
+            "Pick 'Pod' and type e.g. 'weaviate-0' to keep only that pod's rows."
+        )
         self._type_combo.currentIndexChanged.connect(self._apply_filter)
         row.addWidget(self._type_combo)
 
         # Search bar (searches the field selected in Type combo)
         self._search_bar = QLineEdit()
         self._search_bar.setObjectName("infraSearchBar")
-        self._search_bar.setPlaceholderText("Search message …")
+        self._search_bar.setPlaceholderText("Search selected field …")
         self._search_bar.textChanged.connect(self._apply_filter)
         self._search_bar.setMinimumWidth(80)
         row.addWidget(self._search_bar)
@@ -236,11 +241,12 @@ class LogView(QWidget, WorkerMixin):
 
         self._excl_field_combo = QComboBox()
         self._excl_field_combo.setObjectName("infraFilterCombo")
-        self._excl_field_combo.addItems(["Action", "Message", "User", "Method"])
+        self._excl_field_combo.addItems(["Action", "Message", "User", "Method", "Pod"])
         self._excl_field_combo.setFixedWidth(100)
         self._excl_field_combo.setToolTip(
             "Field to apply the exclusion term against.\n"
-            "Rows where this field contains the exclusion text will be hidden."
+            "Rows where this field contains the exclusion text will be hidden.\n"
+            "Pick 'Pod' to hide one or more pods by name (comma-separated)."
         )
         self._excl_field_combo.currentIndexChanged.connect(self._apply_filter)
         row.addWidget(self._excl_field_combo)
@@ -261,7 +267,9 @@ class LogView(QWidget, WorkerMixin):
 
         # Status
         self._status_label = QLabel(
-            f"Namespace: {self._namespace}" if self._namespace else "No namespace configured."
+            f"Namespace: {self._namespace} — click 'Get Logs' to fetch."
+            if self._namespace
+            else "No namespace configured."
         )
         self._status_label.setObjectName("infraLogStatus")
         row.addWidget(self._status_label)
@@ -279,21 +287,11 @@ class LogView(QWidget, WorkerMixin):
         self._table.setWordWrap(False)
         self._table.setSortingEnabled(True)
         self._table.verticalHeader().setVisible(False)
-        self._table.horizontalHeader().setStretchLastSection(True)
 
-        # Column widths
-        widths = {
-            COL_TIMESTAMP: 175,
-            COL_LEVEL: 70,
-            COL_ACTION: 160,
-            COL_MESSAGE: 400,
-            COL_USER: 140,
-            COL_REQUEST: 90,
-            COL_METHOD: 80,
-            COL_POD: 140,
-        }
-        for col, w in widths.items():
-            self._table.setColumnWidth(col, w)
+        h_header = self._table.horizontalHeader()
+        h_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        h_header.setSectionResizeMode(COL_MESSAGE, QHeaderView.ResizeMode.Stretch)
+        self._table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         self._table.cellDoubleClicked.connect(self._on_row_double_clicked)
         return self._table
@@ -421,6 +419,7 @@ class LogView(QWidget, WorkerMixin):
             "Request": entry.get("request", ""),
             "User": entry.get("user", ""),
             "Method": entry.get("method", ""),
+            "Pod": entry.get("pod", ""),
         }
         haystack = field_map.get(field, entry.get("message", ""))
         return query in haystack.lower()
@@ -441,6 +440,7 @@ class LogView(QWidget, WorkerMixin):
             "Message": entry.get("message", ""),
             "User": entry.get("user", ""),
             "Method": entry.get("method", ""),
+            "Pod": entry.get("pod", ""),
         }
         haystack = field_map.get(excl_field, "").lower()
         return any(term in haystack for term in excl_terms)

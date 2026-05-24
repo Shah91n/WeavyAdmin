@@ -214,9 +214,6 @@ class StatefulSetView(QWidget, WorkerMixin):
         self._build_ui()
         _state.namespace_changed.connect(self.set_namespace)
 
-        if self._namespace:
-            self.fetch_sts()
-
     def cleanup(self) -> None:
         import contextlib
 
@@ -230,10 +227,8 @@ class StatefulSetView(QWidget, WorkerMixin):
     # ------------------------------------------------------------------
 
     def set_namespace(self, namespace: str) -> None:
-        """Push a late-arriving namespace and trigger an initial fetch."""
+        """Push a late-arriving namespace. Fetch is user-triggered via the Get STS button."""
         self._namespace = namespace
-        if namespace:
-            self.fetch_sts()
 
     def fetch_sts(self) -> None:
         """Fetch (or re-fetch) the StatefulSet manifest."""
@@ -285,16 +280,15 @@ class StatefulSetView(QWidget, WorkerMixin):
         row.setContentsMargins(8, 6, 8, 6)
         row.setSpacing(8)
 
-        self._refresh_btn = QPushButton("↻")
-        self._refresh_btn.setObjectName("refreshIconBtn")
-        self._refresh_btn.setFixedSize(28, 28)
-        self._refresh_btn.setToolTip("Re-fetch the Weaviate StatefulSet manifest from Kubernetes")
-        self._refresh_btn.clicked.connect(self.fetch_sts)
-        row.addWidget(self._refresh_btn)
+        self._get_sts_btn = QPushButton("Get STS")
+        self._get_sts_btn.setObjectName("infraRefreshBtn")
+        self._get_sts_btn.setToolTip("Fetch the Weaviate StatefulSet manifest from Kubernetes")
+        self._get_sts_btn.clicked.connect(self.fetch_sts)
+        row.addWidget(self._get_sts_btn)
 
         row.addStretch()
 
-        self._status_label = QLabel("Ready")
+        self._status_label = QLabel("Click 'Get STS' to fetch the StatefulSet manifest")
         self._status_label.setObjectName("infraStatefulSetStatus")
         row.addWidget(self._status_label)
 
@@ -872,4 +866,4 @@ class StatefulSetView(QWidget, WorkerMixin):
     # ------------------------------------------------------------------
 
     def _set_controls_enabled(self, enabled: bool) -> None:
-        self._refresh_btn.setEnabled(enabled)
+        self._get_sts_btn.setEnabled(enabled)

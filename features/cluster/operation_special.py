@@ -6,10 +6,10 @@ The Aggregation Report is a standalone view in ``aggregation_view.py``.
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
-    QGridLayout,
-    QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPlainTextEdit,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -30,46 +30,45 @@ class ClusterOperationViewSpecialBase(QWidget):
             self.layout.takeAt(0).widget().deleteLater()
 
     def _render_summary(self, stats: list[tuple[str, str]]) -> None:
-        """Append a compact key/value summary frame to the view layout.
+        """Append a copyable key/value summary frame to the view layout.
 
-        *stats* is a list of (label, value) string pairs. Both columns are
-        rendered as selectable QLabels so the user can drag-select to copy.
+        *stats* is a list of (label, value) string pairs rendered into a single
+        read-only ``QPlainTextEdit`` so the user can drag-select across the
+        whole block and copy it as one chunk — matching the Aggregation Report
+        summary box.
         """
         frame = QFrame()
         frame.setObjectName("summaryFrame")
         frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         frame_layout = QVBoxLayout(frame)
         frame_layout.setContentsMargins(12, 10, 12, 10)
-        frame_layout.setSpacing(8)
+        frame_layout.setSpacing(6)
 
         header = QLabel("Summary")
         header.setObjectName("summaryHeader")
         frame_layout.addWidget(header)
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(24)
-        grid.setVerticalSpacing(4)
-        grid.setContentsMargins(0, 0, 0, 0)
-        for row_idx, (label_text, value_text) in enumerate(stats):
-            label = QLabel(label_text)
-            label.setObjectName("summaryLabel")
-            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-
-            value = QLabel(value_text)
-            value.setObjectName("summaryValue")
-            value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-
-            grid.addWidget(label, row_idx, 0)
-            grid.addWidget(value, row_idx, 1)
-
-        wrap = QHBoxLayout()
-        wrap.setContentsMargins(0, 0, 0, 0)
-        wrap.addLayout(grid)
-        wrap.addStretch()
-        frame_layout.addLayout(wrap)
+        summary_box = QPlainTextEdit()
+        summary_box.setObjectName("aggSummaryBox")
+        summary_box.setReadOnly(True)
+        summary_box.setPlainText(self._format_summary_text(stats))
+        # Size to content: header line-height × rows + padding.
+        line_h = summary_box.fontMetrics().lineSpacing()
+        summary_box.setFixedHeight(line_h * max(len(stats), 1) + 24)
+        summary_box.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        summary_box.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        frame_layout.addWidget(summary_box)
 
         self.layout.addWidget(frame)
+
+    @staticmethod
+    def _format_summary_text(stats: list[tuple[str, str]]) -> str:
+        """Render (label, value) pairs as left-aligned monospaced lines."""
+        if not stats:
+            return ""
+        width = max(len(label) for label, _ in stats)
+        return "\n".join(f"{label.ljust(width)}  {value}" for label, value in stats)
 
 
 class ClusterMultiTenancyViewSpecial(ClusterOperationViewSpecialBase):

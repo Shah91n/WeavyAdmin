@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '🔍 Compliance check: enumerate which CLAUDE.md rules applied to this change set and state ✅/⚠️ for each before ending the turn.'"
+          },
+          {
+            "type": "command",
+            "command": "cd /Users/mohamedshahin/shahin/WeavyAdmin && ruff check . 2>&1 || echo '⚠️ Ruff failures above — fix before ending turn (CLAUDE.md: Code Quality).'"
+          }
+        ]
+      }
+    ]
+  }
+}

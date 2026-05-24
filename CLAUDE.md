@@ -158,3 +158,4 @@ dialogs/                         Shared QDialogs — not owned by any single fea
 2. Grep all usages after renaming/removing an attribute.
 3. Check all workers for the same bug pattern after fixing one.
 4. Update `CLAUDE-PLAN.md` if there is an active plan — mark completed steps, add notes.
+5. Explicitly enumerate which CLAUDE.md rules apply to the change and state ✅ / ⚠️ for each. If anything is ⚠️ flag it instead of silently moving on.

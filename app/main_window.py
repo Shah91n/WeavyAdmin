@@ -163,8 +163,10 @@ class MainWindow(QMainWindow):
         self._toolbar_latency = QLabel("—")
         self._toolbar_latency.setObjectName("toolbarLatency")
         self._toolbar_latency.setToolTip(
-            "Weaviate cluster response time — measured as the round-trip duration of a live ping "
-            "(is_alive) to the cluster endpoint at connect time.\n"
+            "Network round-trip from your machine to the Weaviate cluster.\n"
+            "Measured as a single GET /v1/.well-known/live ping, refreshed on every dashboard load.\n"
+            "Includes your internet, the path in between, and the cluster — a high value may be "
+            "your local network, not the cluster itself.\n"
             "Green = < 100 ms   Yellow = 100–499 ms   Red = ≥ 500 ms"
         )
         self._toolbar.addWidget(self._toolbar_latency)
@@ -553,7 +555,7 @@ class MainWindow(QMainWindow):
         if query_to is None and insert_to is None:
             self._toolbar_timeouts.setVisible(False)
             return
-        self._toolbar_timeouts.setText(f"⏱ Q:{query_to}s · I:{insert_to}s")
+        self._toolbar_timeouts.setText(f"⏱ Query:{query_to}s · Insert:{insert_to}s")
         self._toolbar_timeouts.setToolTip(
             "Active Weaviate client timeouts for this connection.\n"
             f"Query: {query_to}s  ·  Insert: {insert_to}s  ·  Init: {init_to}s\n"

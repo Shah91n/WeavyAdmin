@@ -119,6 +119,7 @@ class ClusterBackupViewSpecial(QWidget):
 
     def _build_summary_frame(self) -> QFrame:
         frame = QFrame()
+        frame.setObjectName("summaryFrame")
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(frame)
@@ -154,6 +155,7 @@ class ClusterBackupViewSpecial(QWidget):
 
     def _build_list_section(self) -> QFrame:
         frame = QFrame()
+        frame.setObjectName("summaryFrame")
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -341,6 +343,7 @@ class ClusterBackupViewSpecial(QWidget):
 
     def _build_ops_section(self) -> QFrame:
         frame = QFrame()
+        frame.setObjectName("summaryFrame")
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -505,6 +508,7 @@ class ClusterBackupViewSpecial(QWidget):
 
     def _build_report_section(self) -> QFrame:
         frame = QFrame()
+        frame.setObjectName("summaryFrame")
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(12, 10, 12, 10)

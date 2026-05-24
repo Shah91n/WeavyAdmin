@@ -60,20 +60,20 @@ class ClusterRaftViewSpecial(QWidget):
         # ── Node Overview table ─────────────────────────────────────
         nodes = data.get("nodes", [])
         if nodes:
-            self._render_section_header("Node Overview")
-            self._render_node_overview_table(nodes)
+            self._render_section("Node Overview", self._build_node_overview_table(nodes))
 
             # ── RAFT Stats table (one row per node) ─────────────────
-            self._render_section_header("RAFT Stats")
-            self._render_raft_stats_table(nodes)
+            self._render_section("RAFT Stats", self._build_raft_stats_table(nodes))
 
             # ── RAFT Configuration table (cluster members) ──────────
             # Use config from the first node that has it
             for node in nodes:
                 members = node.get("raft_configuration", [])
                 if members:
-                    self._render_section_header("RAFT Configuration (Cluster Members)")
-                    self._render_raft_configuration_table(members)
+                    self._render_section(
+                        "RAFT Configuration (Cluster Members)",
+                        self._build_raft_configuration_table(members),
+                    )
                     break
 
         self.layout.addStretch()
@@ -87,6 +87,7 @@ class ClusterRaftViewSpecial(QWidget):
         synchronized = data.get("synchronized", False)
 
         summary_frame = QFrame()
+        summary_frame.setObjectName("summaryFrame")
         summary_frame.setFrameShape(QFrame.Shape.StyledPanel)
         summary_layout = QVBoxLayout(summary_frame)
 
@@ -126,19 +127,29 @@ class ClusterRaftViewSpecial(QWidget):
         self._summary_toggle.setText("▼ Summary" if checked else "▶ Summary")
 
     # ------------------------------------------------------------------
-    # Section header helper
+    # Section wrapper — header + table inside a styled summaryFrame
     # ------------------------------------------------------------------
 
-    def _render_section_header(self, title):
-        label = QLabel(title)
-        label.setObjectName("subSectionHeader")
-        self.layout.addWidget(label)
+    def _render_section(self, title: str, table: QTableWidget) -> None:
+        frame = QFrame()
+        frame.setObjectName("summaryFrame")
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(12, 10, 12, 10)
+        frame_layout.setSpacing(8)
+
+        header = QLabel(title)
+        header.setObjectName("subSectionHeader")
+        frame_layout.addWidget(header)
+        frame_layout.addWidget(table)
+
+        self.layout.addWidget(frame)
 
     # ------------------------------------------------------------------
     # Node overview (basic node info)
     # ------------------------------------------------------------------
 
-    def _render_node_overview_table(self, nodes):
+    def _build_node_overview_table(self, nodes: list) -> QTableWidget:
         columns = [
             "name",
             "status",
@@ -150,14 +161,13 @@ class ClusterRaftViewSpecial(QWidget):
             "leader_address",
             "initial_last_applied_index",
         ]
-        table = self._build_table(nodes, columns)
-        self.layout.addWidget(table)
+        return self._build_table(nodes, columns)
 
     # ------------------------------------------------------------------
     # RAFT stats table (one row per node, columns = raft fields)
     # ------------------------------------------------------------------
 
-    def _render_raft_stats_table(self, nodes):
+    def _build_raft_stats_table(self, nodes: list) -> QTableWidget:
         # Build rows from each node's raft sub-dict, prepending node name
         rows = []
         all_keys = set()
@@ -195,17 +205,15 @@ class ClusterRaftViewSpecial(QWidget):
         # Append any unexpected keys not in the preferred list
         columns += sorted(all_keys - set(columns))
 
-        table = self._build_table(rows, columns)
-        self.layout.addWidget(table)
+        return self._build_table(rows, columns)
 
     # ------------------------------------------------------------------
     # RAFT configuration table (cluster members)
     # ------------------------------------------------------------------
 
-    def _render_raft_configuration_table(self, members):
+    def _build_raft_configuration_table(self, members: list) -> QTableWidget:
         columns = ["node_id", "address", "suffrage"]
-        table = self._build_table(members, columns)
-        self.layout.addWidget(table)
+        return self._build_table(members, columns)
 
     # ------------------------------------------------------------------
     # Shared helpers

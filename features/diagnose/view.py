@@ -429,10 +429,9 @@ class DiagnoseView(QWidget, WorkerMixin):
 
         self._root.addWidget(
             _StatusBanner(
-                f"🔴  {len(issues)} collection(s) with replication issues — "
-                "replication issues can cause inconsistency. Recommended fix: enable async "
-                "replication and set deletion strategy to TimeBasedResolution. Odd replication "
-                "factors (3, 5, 7) work best for RAFT consensus.",
+                f"🔴  {len(issues)} collection(s) with replication issues. "
+                "Replication issues can cause inconsistency. Recommended fix: enable async "
+                "replication and set deletion strategy to TimeBasedResolution.",
                 "error",
             )
         )

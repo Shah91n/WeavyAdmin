@@ -142,7 +142,7 @@ class AggregationReportView(QWidget, WorkerMixin):
         v.setSpacing(6)
 
         row = QHBoxLayout()
-        title = QLabel("Full Cluster Aggregation")
+        title = QLabel("Full Schema Aggregation")
         title.setObjectName("summaryHeader")
         row.addWidget(title)
         row.addStretch()

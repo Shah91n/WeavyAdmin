@@ -125,7 +125,7 @@ class _FilterBuilderPanel(QWidget):
         self._rows_layout.setSpacing(4)
         grp_layout.addWidget(self._rows_container)
 
-        add_btn = QPushButton("+ Add condition")
+        add_btn = QPushButton("Add condition")
         add_btn.setObjectName("addFilterConditionBtn")
         add_btn.clicked.connect(self._add_row)
         grp_layout.addWidget(add_btn, alignment=Qt.AlignmentFlag.AlignLeft)

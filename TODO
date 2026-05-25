@@ -1,3 +1,1 @@
-[] Add update-available indicator in main UI (highlight key feature when a new version exists)
-[] Implement live monitoring dashboard
-[] DeDup GoRoutines in the Profiling
+- Implement live monitoring dashboard

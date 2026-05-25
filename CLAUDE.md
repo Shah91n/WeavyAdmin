@@ -140,6 +140,13 @@ dialogs/                         Shared QDialogs — not owned by any single fea
 - Deviate from the shared primitives only when the underlying data shape genuinely demands it (e.g. a view with no summary, or one that needs a fundamentally different table). When deviating, leave a one-line comment explaining why.
 - When polishing one view in a sibling group, propagate the change to the others in the same commit.
 
+### Buttons
+- **Default = green, app-wide.** Every `QPushButton` inherits the global green style from `_QSS_BUTTONS` in `shared/styles/global_qss.py` — including infra views. Do not introduce a new "secondary"/grey style; there is no `secondaryButton` selector and there is no separate infra button identity.
+- **Custom `setObjectName()` only for genuinely different visual treatment.** Allowed: `*DangerBtn` / `dangerButton` (red destructive — Delete, Revoke, Cancel-of-running-op), `disconnectButton` (red), `backupCancelBtn` (red, cancel running backup), `deleteCollectionsDeleteButton` (red), `diagFixReplicationButton` (yellow warning), `refreshIconBtn` (transparent icon-only chrome), `schemaHeaderBtn` (sidebar icon chrome), `stsCollapseBtn` (infra collapse-toggle chrome), `aboutCloseButton` / `aboutCheckUpdateButton` (subtle About-dialog chrome), `backupFilterBtn` (toggle/chip), `queryAgentSuggestionButton` (large suggestion card), `createCollectionAddPropBtn` (dashed-outline add). Anything outside these intentional roles → drop the objectName and let it inherit green.
+- **No decorative emojis/icons next to a text label.** `QPushButton("Edit")`, not `QPushButton("✏  Edit")`. `QPushButton("Refresh")`, not `QPushButton("⟳  Refresh")`. The text is the label; an icon next to it duplicates meaning and breaks visual consistency.
+- **Icon-only buttons are fine** — when the icon *is* the label and there is no text (e.g. toolbar `↻`, `×`, `⊠`, `⚙`, `🗑`), keep the icon. Pair these with `refreshIconBtn` / `schemaHeaderBtn` / equivalent icon chrome.
+- **Functional indicators inside the label stay.** Collapse-toggle arrows (`▼ Summary`, `▶ Enabled Modules`) signal expand/collapse state. Directional words inside the action (`Set Selected → READY`) carry meaning the words alone don't. Keep both — they are not decoration.
+
 ### Naming
 - Every feature uses the same name across: file, class, sidebar label, tab ID, tab label, QSS object name, signal names. Rename all atomically.
 

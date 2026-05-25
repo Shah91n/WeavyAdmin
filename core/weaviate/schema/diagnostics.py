@@ -157,19 +157,23 @@ def diagnose_schema() -> dict:
     }
 
 
+_QUANTIZER_KEYS = ("pq", "bq", "sq", "rq")
+
+
 def _check_compression(cfg: dict) -> dict:
     vi_cfg = cfg.get("vectorIndexConfig") or cfg.get("vectorizer_config") or {}
     vi_type = cfg.get("vectorIndexType", "hnsw")
+    quantizer = vi_cfg.get("quantizer") if isinstance(vi_cfg.get("quantizer"), dict) else {}
 
-    quantizer = vi_cfg.get("quantizer")
-    pq = vi_cfg.get("pq") or (quantizer.get("pq") if isinstance(quantizer, dict) else None)
-    bq = vi_cfg.get("bq") or (quantizer.get("bq") if isinstance(quantizer, dict) else None)
-    sq = vi_cfg.get("sq") or (quantizer.get("sq") if isinstance(quantizer, dict) else None)
+    active: list[str] = []
+    for key in _QUANTIZER_KEYS:
+        q = vi_cfg.get(key) or quantizer.get(key)
+        if isinstance(q, dict) and q.get("enabled"):
+            bits = q.get("bits")
+            active.append(f"{key}, {bits}-bit" if isinstance(bits, int) else key)
 
-    has_compression = any(q and q.get("enabled") for q in (pq, bq, sq))
-
-    if has_compression:
-        return {"status": "ok", "summary": "Compression configured"}
+    if active:
+        return {"status": "ok", "summary": f"Compression configured ({'; '.join(active)})"}
     if str(vi_type).lower() == "flat":
         return {"status": "ok", "summary": "Flat index — compression not applicable"}
     return {"status": "warning", "summary": "Compression disabled"}

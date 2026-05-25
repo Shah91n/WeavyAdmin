@@ -183,7 +183,6 @@ class RBACAnalysisView(QWidget, WorkerMixin):
         row.setSpacing(8)
 
         self._refresh_btn = QPushButton("Refresh Analysis")
-        self._refresh_btn.setObjectName("infraRefreshBtn")
         self._refresh_btn.setToolTip("Re-fetch RBAC authorization logs and rebuild analysis")
         self._refresh_btn.clicked.connect(self.refresh)
         row.addWidget(self._refresh_btn)

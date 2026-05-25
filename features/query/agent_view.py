@@ -86,19 +86,16 @@ class QueryAgentView(QWidget, WorkerMixin):
         col_header.addStretch()
 
         self._check_all_btn = QPushButton("All")
-        self._check_all_btn.setObjectName("secondaryButton")
         self._check_all_btn.setToolTip("Check all collections")
         self._check_all_btn.clicked.connect(self._check_all)
         col_header.addWidget(self._check_all_btn)
 
         self._uncheck_all_btn = QPushButton("None")
-        self._uncheck_all_btn.setObjectName("secondaryButton")
         self._uncheck_all_btn.setToolTip("Uncheck all collections")
         self._uncheck_all_btn.clicked.connect(self._uncheck_all)
         col_header.addWidget(self._uncheck_all_btn)
 
         self._fetch_cols_btn = QPushButton("Refresh")
-        self._fetch_cols_btn.setObjectName("secondaryButton")
         self._fetch_cols_btn.clicked.connect(self._fetch_collections)
         col_header.addWidget(self._fetch_cols_btn)
         col_layout.addLayout(col_header)
@@ -222,7 +219,6 @@ class QueryAgentView(QWidget, WorkerMixin):
         btn_col.addWidget(self._send_btn)
 
         self._clear_btn = QPushButton("Clear")
-        self._clear_btn.setObjectName("secondaryButton")
         self._clear_btn.setMinimumHeight(34)
         self._clear_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self._clear_btn.clicked.connect(self._on_clear)

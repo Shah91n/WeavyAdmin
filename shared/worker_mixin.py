@@ -31,6 +31,8 @@ _DETACH_SIGNALS: tuple[str, ...] = (
     "traffic_ready",
     # StatefulSet worker
     "sts_ready",
+    "saved",
+    "state_changed",
     # Read-view workers
     "all_data_loaded",
     "operation_failed",

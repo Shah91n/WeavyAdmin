@@ -21,7 +21,7 @@ INFRA_BG_PRIMARY = "#0D1117"
 INFRA_BG_SECONDARY = "#161B22"
 INFRA_BORDER = "#30363D"
 
-INFRA_BTN_BG = "#21262d"  # default button background
+INFRA_BTN_BG = "#21262d"  # tab hover surface
 INFRA_SELECTION_BG = "#1f4068"  # table / list row selection highlight
 
 INFRA_CHIP_BG = "#1a2d44"  # inline chip / tag background
@@ -41,13 +41,6 @@ INFRA_TEXT_MUTED = "#8B949E"
 
 INFRA_ACCENT_BLUE = "#58a6ff"
 INFRA_ACCENT_BLUE_HOVER = "#79c0ff"
-
-# ---------------------------------------------------------------------------
-# COLOUR TOKENS — Profile Button
-# ---------------------------------------------------------------------------
-
-INFRA_PROFILE_BTN = "#1f6feb"
-INFRA_PROFILE_BTN_HOVER = "#388bfd"
 
 # ---------------------------------------------------------------------------
 # COLOUR TOKENS — Log Levels
@@ -173,25 +166,6 @@ QWidget#infraToolbar {{
     padding: 4px 8px;
 }}
 
-QPushButton#infraRefreshBtn {{
-    background-color: {INFRA_BTN_BG};
-    color: {INFRA_TEXT_PRIMARY};
-    border: 1px solid {INFRA_BORDER};
-    border-radius: 4px;
-    padding: 5px 14px;
-    font-size: 12px;
-}}
-
-QPushButton#infraRefreshBtn:hover {{
-    background-color: {INFRA_BORDER};
-    border-color: {INFRA_ACCENT_BLUE};
-}}
-
-QPushButton#infraRefreshBtn:disabled {{
-    color: {INFRA_TEXT_MUTED};
-    border-color: {INFRA_BORDER};
-}}
-
 QLineEdit#infraSearchBar {{
     background-color: {INFRA_BG_PRIMARY};
     color: {INFRA_TEXT_PRIMARY};
@@ -279,18 +253,6 @@ QTextEdit#infraJsonText {{
     padding: 8px;
 }}
 
-QPushButton#infraJsonCloseBtn {{
-    background-color: {INFRA_BTN_BG};
-    color: {INFRA_TEXT_PRIMARY};
-    border: 1px solid {INFRA_BORDER};
-    border-radius: 4px;
-    padding: 5px 18px;
-    font-size: 12px;
-}}
-
-QPushButton#infraJsonCloseBtn:hover {{
-    background-color: {INFRA_BORDER};
-}}
 """
 
 # ---------------------------------------------------------------------------
@@ -387,6 +349,24 @@ QTableWidget#stsTable::item:selected {{
     background-color: {INFRA_SELECTION_BG};
 }}
 
+/* Inline editor (QLineEdit Qt drops into the cell on edit). Without this
+   the editor inherits the table's monospace style and zero padding, so
+   the caret and typed characters get clipped by the cell padding above
+   and the row's border-bottom — looks like "I can't see what I'm
+   writing". The vertical padding stays small (2 px) so glyphs are not
+   pushed below the editor's visible area; the env-editor table also
+   sets a taller default row height so the editor has breathing room. */
+QTableWidget#stsTable QLineEdit {{
+    background-color: {INFRA_BG_SECONDARY};
+    color: {INFRA_TEXT_PRIMARY};
+    border: 1px solid {INFRA_ACCENT_BLUE};
+    padding: 2px 8px;
+    margin: 0;
+    min-height: 22px;
+    selection-background-color: {INFRA_SELECTION_BG};
+    selection-color: {INFRA_TEXT_PRIMARY};
+}}
+
 QHeaderView#stsTable::section {{
     background-color: {INFRA_BG_SECONDARY};
     color: {INFRA_TEXT_MUTED};
@@ -437,6 +417,71 @@ QPushButton#stsCollapseBtn {{
 
 QPushButton#stsCollapseBtn:hover {{
     color: {INFRA_TEXT_PRIMARY};
+}}
+
+QLabel#stsRolloutStatus {{
+    color: {INFRA_TEXT_PRIMARY};
+    font-size: 14px;
+    font-weight: bold;
+    padding: 4px 0;
+}}
+
+QLabel#stsRolloutStatusOk {{
+    color: {COLOR_BRIDGE_CONNECTED};
+    font-size: 14px;
+    font-weight: bold;
+    padding: 4px 0;
+}}
+
+QLabel#stsRolloutStatusWarn {{
+    color: {COLOR_BRIDGE_PENDING};
+    font-size: 14px;
+    font-weight: bold;
+    padding: 4px 0;
+}}
+
+QLabel#stsRolloutStatusError {{
+    color: {COLOR_BRIDGE_ERROR};
+    font-size: 14px;
+    font-weight: bold;
+    padding: 4px 0;
+}}
+
+QLabel#stsRolloutRevision {{
+    color: {INFRA_TEXT_MUTED};
+    font-size: 11px;
+    padding: 0 0 4px 0;
+}}
+
+QLabel#stsRolloutSectionTitle {{
+    color: {INFRA_TEXT_PRIMARY};
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 0 2px 0;
+}}
+
+QLabel#stsRolloutRefresh {{
+    color: {INFRA_TEXT_MUTED};
+    font-size: 11px;
+}}
+
+QLabel#stsEnvEditorWarning {{
+    color: {COLOR_BRIDGE_PENDING};
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 0;
+}}
+
+QLabel#stsEnvEditorPending {{
+    color: {INFRA_TEXT_PRIMARY};
+    font-size: 12px;
+    padding: 4px 0;
+}}
+
+QLabel#stsEnvEditorPendingNone {{
+    color: {INFRA_TEXT_MUTED};
+    font-size: 12px;
+    padding: 4px 0;
 }}
 """
 
@@ -673,25 +718,6 @@ QProgressBar#progressBar {{
 QProgressBar#progressBar::chunk {{
     background-color: {INFRA_ACCENT_BLUE};
     border-radius: 3px;
-}}
-
-QPushButton#profileButton {{
-    background-color: {INFRA_PROFILE_BTN};
-    color: #ffffff;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 18px;
-    font-size: 13px;
-    font-weight: 600;
-}}
-
-QPushButton#profileButton:hover {{
-    background-color: {INFRA_PROFILE_BTN_HOVER};
-}}
-
-QPushButton#profileButton:disabled {{
-    background-color: {INFRA_BTN_BG};
-    color: {INFRA_TEXT_MUTED};
 }}
 
 QLabel#profilingToolWarning {{

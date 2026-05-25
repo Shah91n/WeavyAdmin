@@ -440,7 +440,7 @@ class DiagnoseView(QWidget, WorkerMixin):
         self._replication_issue_collections = names
 
         action_row = QHBoxLayout()
-        self._fix_replication_button = QPushButton("🛠  Apply Recommended Fix")
+        self._fix_replication_button = QPushButton("Apply Recommended Fix")
         self._fix_replication_button.setObjectName("diagFixReplicationButton")
         self._fix_replication_button.setToolTip(
             "Set async_enabled=True and deletion_strategy=TimeBasedResolution on every "

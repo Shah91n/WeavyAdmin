@@ -155,9 +155,6 @@ class _JsonDialog(QDialog):
 
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         btn_box.rejected.connect(self.reject)
-        close_btn = btn_box.button(QDialogButtonBox.StandardButton.Close)
-        if close_btn:
-            close_btn.setObjectName("infraJsonCloseBtn")
         layout.addWidget(btn_box)
 
 
@@ -262,7 +259,6 @@ class LBTrafficView(QWidget, WorkerMixin):
         row.addWidget(self._time_combo)
 
         self._refresh_btn = QPushButton("Fetch Traffic")
-        self._refresh_btn.setObjectName("infraRefreshBtn")
         self._refresh_btn.setToolTip(
             "Fetch LB traffic for the selected time window.\n"
             "Choose a time window first, then click here."

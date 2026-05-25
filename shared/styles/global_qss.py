@@ -800,18 +800,6 @@ QLabel#validationError {{
     color: {COLOR_ERROR};
 }}
 
-QPushButton#secondaryButton {{
-    background-color: {COLOR_BORDER};
-    color: {COLOR_TEXT_PRIMARY};
-    padding: 8px 20px;
-    border-radius: 4px;
-    font-weight: bold;
-}}
-
-QPushButton#secondaryButton:hover {{
-    background-color: {COLOR_SECONDARY_BTN_HOVER};
-}}
-
 QPushButton#refreshIconBtn {{
     background-color: transparent;
     color: {COLOR_ACCENT_GREEN};

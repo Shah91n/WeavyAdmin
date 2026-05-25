@@ -160,7 +160,6 @@ class RequestLogView(QWidget):
 
         # Clear button
         clear_btn = QPushButton("Clear")
-        clear_btn.setObjectName("secondaryButton")
         clear_btn.setMaximumWidth(70)
         clear_btn.clicked.connect(self._clear_log)
         filter_layout.addWidget(clear_btn)

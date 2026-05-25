@@ -182,8 +182,7 @@ class ProfilingView(QWidget):
 
         layout.addWidget(self._build_api_key_panel())
 
-        self._goroutine_btn = QPushButton("🔍 Quick Goroutine Check")
-        self._goroutine_btn.setObjectName("profileButton")
+        self._goroutine_btn = QPushButton("Quick Goroutine Check")
         self._goroutine_btn.clicked.connect(self._start_goroutine_check)
         layout.addWidget(self._goroutine_btn)
 
@@ -379,7 +378,6 @@ class ProfilingView(QWidget):
         # Save folder
         folder_row = QHBoxLayout()
         choose_btn = QPushButton("Choose Folder…")
-        choose_btn.setObjectName("infraRefreshBtn")
         choose_btn.clicked.connect(self._choose_folder)
         folder_row.addWidget(choose_btn)
         self._folder_label = QLabel(
@@ -391,8 +389,7 @@ class ProfilingView(QWidget):
         layout.addLayout(folder_row)
 
         # Capture button
-        self._capture_btn = QPushButton("📊 Capture & Save Profiles")
-        self._capture_btn.setObjectName("profileButton")
+        self._capture_btn = QPushButton("Capture & Save Profiles")
         self._capture_btn.clicked.connect(self._start_capture)
         layout.addWidget(self._capture_btn)
 

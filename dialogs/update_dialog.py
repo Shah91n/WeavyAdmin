@@ -111,7 +111,6 @@ class UpdateDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setObjectName("secondaryButton")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 

@@ -172,7 +172,6 @@ class RBACLogView(QWidget, WorkerMixin):
         row.setSpacing(8)
 
         self._get_logs_btn = QPushButton("Get Logs")
-        self._get_logs_btn.setObjectName("infraRefreshBtn")
         self._get_logs_btn.setToolTip(
             "Fetch RBAC authorization logs (action=authorize entries only)"
         )

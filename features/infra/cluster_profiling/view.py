@@ -165,8 +165,7 @@ class ClusterProfilingView(QWidget, WorkerMixin):
         self._result_label.setObjectName("profilingSectionSubHeader")
         self._result_label.setWordWrap(True)
         result_l.addWidget(self._result_label, 1)
-        open_btn = QPushButton("📂 Open Folder")
-        open_btn.setObjectName("infraRefreshBtn")
+        open_btn = QPushButton("Open Folder")
         open_btn.clicked.connect(self._open_final_dir)
         result_l.addWidget(open_btn)
         root.addWidget(self._result_bar)
@@ -207,7 +206,6 @@ class ClusterProfilingView(QWidget, WorkerMixin):
         # Save folder
         folder_row = QHBoxLayout()
         choose_btn = QPushButton("Choose Folder…")
-        choose_btn.setObjectName("infraRefreshBtn")
         choose_btn.clicked.connect(self._choose_folder)
         folder_row.addWidget(choose_btn)
         self._folder_label = QLabel(
@@ -220,13 +218,11 @@ class ClusterProfilingView(QWidget, WorkerMixin):
 
         # Action buttons
         btn_row = QHBoxLayout()
-        self._start_btn = QPushButton("▶ Start Capture")
-        self._start_btn.setObjectName("profileButton")
+        self._start_btn = QPushButton("Start Capture")
         self._start_btn.clicked.connect(self._start_capture)
         btn_row.addWidget(self._start_btn)
 
-        self._cancel_btn = QPushButton("◼ Cancel")
-        self._cancel_btn.setObjectName("infraRefreshBtn")
+        self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.setEnabled(False)
         self._cancel_btn.clicked.connect(self._cancel_capture)
         btn_row.addWidget(self._cancel_btn)

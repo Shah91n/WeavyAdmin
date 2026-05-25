@@ -205,12 +205,12 @@ class ReadView(QWidget, WorkerMixin):
         footer_layout.addWidget(self.batch_size_combo)
 
         # Pagination buttons
-        self.prev_button = QPushButton("← Previous")
+        self.prev_button = QPushButton("Previous")
         self.prev_button.clicked.connect(self.on_prev_clicked)
         self.prev_button.setEnabled(False)
         footer_layout.addWidget(self.prev_button)
 
-        self.next_button = QPushButton("Next →")
+        self.next_button = QPushButton("Next")
         self.next_button.clicked.connect(self.on_next_clicked)
         self.next_button.setEnabled(False)
         footer_layout.addWidget(self.next_button)

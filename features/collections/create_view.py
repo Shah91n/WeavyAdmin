@@ -500,7 +500,7 @@ class CreateCollectionView(QWidget, WorkerMixin):
         outer.addWidget(self._props_container)
 
         # Add Property button
-        add_btn = QPushButton("+ Add Property")
+        add_btn = QPushButton("Add Property")
         add_btn.setObjectName("createCollectionAddPropBtn")
         add_btn.clicked.connect(self._add_property_row)
         outer.addWidget(add_btn, alignment=Qt.AlignmentFlag.AlignLeft)

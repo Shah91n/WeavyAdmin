@@ -242,7 +242,7 @@ class ShardRebalancerView(QWidget):
         self._rf_spin.setValue(3)
         rf_row.addWidget(self._rf_spin)
 
-        self._compute_plan_btn = QPushButton("⚖️  Compute Balance Plan")
+        self._compute_plan_btn = QPushButton("Compute Balance Plan")
         self._compute_plan_btn.setEnabled(False)
         self._compute_plan_btn.clicked.connect(self._on_compute_plan)
         rf_row.addWidget(self._compute_plan_btn)
@@ -328,7 +328,7 @@ class ShardRebalancerView(QWidget):
 
         act_row.addStretch()
 
-        self._cleanup_ops_btn = QPushButton("🗑  Clean Up History")
+        self._cleanup_ops_btn = QPushButton("Clean Up History")
         self._cleanup_ops_btn.setObjectName("dangerButton")
         self._cleanup_ops_btn.setEnabled(False)
         self._cleanup_ops_btn.setToolTip("Delete all completed and cancelled operation records")

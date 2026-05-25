@@ -109,20 +109,20 @@ class _RolesTab(QWidget, WorkerMixin):
 
         # Toolbar
         toolbar = QHBoxLayout()
-        self._create_btn = QPushButton("+ Create Role")
+        self._create_btn = QPushButton("Create Role")
         self._create_btn.setObjectName("rbacManagerActionBtn")
         self._create_btn.clicked.connect(self._on_create)
 
-        self._edit_btn = QPushButton("✏  Edit")
-        self._edit_btn.setObjectName("secondaryButton")
+        self._edit_btn = QPushButton("Edit")
+        self._edit_btn.setObjectName("rbacManagerActionBtn")
         self._edit_btn.clicked.connect(self._on_edit)
 
-        self._delete_btn = QPushButton("🗑  Delete")
+        self._delete_btn = QPushButton("Delete")
         self._delete_btn.setObjectName("rbacManagerDangerBtn")
         self._delete_btn.clicked.connect(self._on_delete)
 
-        self._refresh_btn = QPushButton("⟳  Refresh")
-        self._refresh_btn.setObjectName("secondaryButton")
+        self._refresh_btn = QPushButton("Refresh")
+        self._refresh_btn.setObjectName("rbacManagerActionBtn")
         self._refresh_btn.clicked.connect(self.load)
 
         for btn in (self._create_btn, self._edit_btn, self._delete_btn, self._refresh_btn):
@@ -296,28 +296,28 @@ class _UsersTab(QWidget, WorkerMixin):
         layout.setSpacing(8)
 
         toolbar = QHBoxLayout()
-        self._create_btn = QPushButton("+ Create User")
+        self._create_btn = QPushButton("Create User")
         self._create_btn.setObjectName("rbacManagerActionBtn")
         self._create_btn.clicked.connect(self._on_create)
 
-        self._delete_btn = QPushButton("🗑  Delete")
+        self._delete_btn = QPushButton("Delete")
         self._delete_btn.setObjectName("rbacManagerDangerBtn")
         self._delete_btn.clicked.connect(self._on_delete)
 
-        self._assign_btn = QPushButton("👤 Assign Roles")
-        self._assign_btn.setObjectName("secondaryButton")
+        self._assign_btn = QPushButton("Assign Roles")
+        self._assign_btn.setObjectName("rbacManagerActionBtn")
         self._assign_btn.clicked.connect(self._on_assign)
 
-        self._revoke_btn = QPushButton("✂  Revoke Roles")
-        self._revoke_btn.setObjectName("secondaryButton")
+        self._revoke_btn = QPushButton("Revoke Roles")
+        self._revoke_btn.setObjectName("rbacManagerDangerBtn")
         self._revoke_btn.clicked.connect(self._on_revoke)
 
-        self._rotate_btn = QPushButton("🔑 Rotate Key")
-        self._rotate_btn.setObjectName("secondaryButton")
+        self._rotate_btn = QPushButton("Rotate Key")
+        self._rotate_btn.setObjectName("rbacManagerActionBtn")
         self._rotate_btn.clicked.connect(self._on_rotate)
 
-        self._refresh_btn = QPushButton("⟳  Refresh")
-        self._refresh_btn.setObjectName("secondaryButton")
+        self._refresh_btn = QPushButton("Refresh")
+        self._refresh_btn.setObjectName("rbacManagerActionBtn")
         self._refresh_btn.clicked.connect(self.load)
 
         for btn in (
@@ -553,16 +553,16 @@ class _GroupsTab(QWidget, WorkerMixin):
         layout.addWidget(note)
 
         toolbar = QHBoxLayout()
-        self._assign_btn = QPushButton("👤 Assign Roles")
+        self._assign_btn = QPushButton("Assign Roles")
         self._assign_btn.setObjectName("rbacManagerActionBtn")
         self._assign_btn.clicked.connect(self._on_assign)
 
-        self._revoke_btn = QPushButton("✂  Revoke Roles")
+        self._revoke_btn = QPushButton("Revoke Roles")
         self._revoke_btn.setObjectName("rbacManagerDangerBtn")
         self._revoke_btn.clicked.connect(self._on_revoke)
 
-        self._refresh_btn = QPushButton("⟳  Refresh")
-        self._refresh_btn.setObjectName("secondaryButton")
+        self._refresh_btn = QPushButton("Refresh")
+        self._refresh_btn.setObjectName("rbacManagerActionBtn")
         self._refresh_btn.clicked.connect(self.load)
 
         for btn in (self._assign_btn, self._revoke_btn, self._refresh_btn):

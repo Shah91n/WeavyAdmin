@@ -561,10 +561,8 @@ class ApiKeyRevealDialog(QDialog):
 
         btn_row = QHBoxLayout()
         copy_btn = QPushButton("Copy to Clipboard")
-        copy_btn.setObjectName("secondaryButton")
         copy_btn.clicked.connect(self._copy)
         dl_btn = QPushButton("Download Credentials")
-        dl_btn.setObjectName("secondaryButton")
         dl_btn.clicked.connect(self._download)
         btn_row.addWidget(copy_btn)
         btn_row.addWidget(dl_btn)

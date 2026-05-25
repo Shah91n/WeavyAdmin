@@ -50,6 +50,12 @@ logger = logging.getLogger(__name__)
 class AggregationReportView(QWidget, WorkerMixin):
     """Standalone Aggregation Report view (does not use ClusterViewWrapper)."""
 
+    # Top-row button label varies with the selected collection's MT status:
+    # for plain collections we aggregate immediately; for MT collections we
+    # first need to fetch the tenant list, so the label signals that flow.
+    _BTN_AGGREGATE_DEFAULT = "Aggregate"
+    _BTN_AGGREGATE_MT = "Aggregate Tenant"
+
     def __init__(self) -> None:
         super().__init__()
         self._worker = None
@@ -94,14 +100,12 @@ class AggregationReportView(QWidget, WorkerMixin):
         self._collection_combo.currentIndexChanged.connect(self._on_collection_changed)
         row1.addWidget(self._collection_combo, 1)
 
-        self._reload_btn = QPushButton("⟳")
-        self._reload_btn.setObjectName("refreshIconBtn")
-        self._reload_btn.setFixedSize(28, 28)
-        self._reload_btn.setToolTip("Reload collection list")
+        self._reload_btn = QPushButton("Reload Collections")
+        self._reload_btn.setToolTip("Reload collection list from the cluster")
         self._reload_btn.clicked.connect(self._reload_collections)
         row1.addWidget(self._reload_btn)
 
-        self._aggregate_one_btn = QPushButton("Aggregate")
+        self._aggregate_one_btn = QPushButton(self._BTN_AGGREGATE_DEFAULT)
         self._aggregate_one_btn.clicked.connect(self._on_aggregate_one)
         row1.addWidget(self._aggregate_one_btn)
         v.addLayout(row1)
@@ -117,7 +121,7 @@ class AggregationReportView(QWidget, WorkerMixin):
         self._tenant_combo = QComboBox()
         self._tenant_combo.setMinimumWidth(240)
         tenant_layout.addWidget(self._tenant_combo, 1)
-        self._aggregate_tenant_btn = QPushButton("Aggregate Tenant")
+        self._aggregate_tenant_btn = QPushButton("Aggregate Tenant Objects")
         self._aggregate_tenant_btn.clicked.connect(self._on_aggregate_tenant)
         tenant_layout.addWidget(self._aggregate_tenant_btn)
         self._tenant_row.setVisible(False)
@@ -179,7 +183,6 @@ class AggregationReportView(QWidget, WorkerMixin):
         header_row.addWidget(title)
         header_row.addStretch()
         self._export_btn = QPushButton("Export CSV")
-        self._export_btn.setObjectName("secondaryButton")
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._on_export_csv)
         header_row.addWidget(self._export_btn)
@@ -265,7 +268,11 @@ class AggregationReportView(QWidget, WorkerMixin):
         self._picker_result.setText("")
         self._tenant_combo.clear()
         item = self._current_collection()
-        self._tenant_row.setVisible(bool(item and item["multi_tenant"]))
+        is_mt = bool(item and item["multi_tenant"])
+        self._tenant_row.setVisible(is_mt)
+        self._aggregate_one_btn.setText(
+            self._BTN_AGGREGATE_MT if is_mt else self._BTN_AGGREGATE_DEFAULT
+        )
 
     # aggregate-one -------------------------------------------------------
 
@@ -305,7 +312,7 @@ class AggregationReportView(QWidget, WorkerMixin):
             self._tenant_combo.addItem(t)
         self._set_picker_status(
             f"'{collection_name}' has {len(tenants):,} tenants — pick one and "
-            "click 'Aggregate Tenant'."
+            "click 'Aggregate Tenant Objects'."
         )
 
     def _on_aggregate_tenant(self) -> None:

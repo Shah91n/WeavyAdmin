@@ -91,13 +91,11 @@ class DeleteCollectionsDialog(QDialog):
         controls.addWidget(self._filter_input, 1)
 
         self._select_all_btn = QPushButton("All")
-        self._select_all_btn.setObjectName("secondaryButton")
         self._select_all_btn.setToolTip("Check every visible collection")
         self._select_all_btn.clicked.connect(self._select_all_visible)
         controls.addWidget(self._select_all_btn)
 
         self._select_none_btn = QPushButton("None")
-        self._select_none_btn.setObjectName("secondaryButton")
         self._select_none_btn.setToolTip("Uncheck every visible collection")
         self._select_none_btn.clicked.connect(self._deselect_all_visible)
         controls.addWidget(self._select_none_btn)
@@ -120,7 +118,6 @@ class DeleteCollectionsDialog(QDialog):
         btn_row.addStretch()
 
         self._cancel_btn = QPushButton("Cancel")
-        self._cancel_btn.setObjectName("secondaryButton")
         self._cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(self._cancel_btn)
 
@@ -157,7 +154,6 @@ class DeleteCollectionsDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self._close_btn = QPushButton("Close")
-        self._close_btn.setObjectName("secondaryButton")
         self._close_btn.clicked.connect(self.accept)
         btn_row.addWidget(self._close_btn)
         layout.addLayout(btn_row)

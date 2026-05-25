@@ -93,9 +93,6 @@ class JsonDialog(QDialog):
 
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         btn_box.rejected.connect(self.reject)
-        close_btn = btn_box.button(QDialogButtonBox.StandardButton.Close)
-        if close_btn:
-            close_btn.setObjectName("infraJsonCloseBtn")
         layout.addWidget(btn_box)
 
 
@@ -186,7 +183,6 @@ class LogView(QWidget, WorkerMixin):
 
         # Get Logs button
         self._get_logs_btn = QPushButton("Get Logs")
-        self._get_logs_btn.setObjectName("infraRefreshBtn")
         self._get_logs_btn.setToolTip("Fetch latest log lines from each pod (up to 5,000 total)")
         self._get_logs_btn.clicked.connect(self.get_logs)
         row.addWidget(self._get_logs_btn)

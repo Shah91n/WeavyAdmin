@@ -8,8 +8,8 @@ A desktop admin console for Weaviate vector database clusters.
 
 <p align="center">
   <img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/6e7a1b18-5fb5-4f96-9404-d4d840c947e3" />
-  <img width="900" height="600" alt="image" src="https://github.com/user-attachments/assets/0694471f-1855-47a5-a0de-10d11c63ebc2" />
-</p>
+  <img width="1914" height="1048" alt="image" src="https://github.com/user-attachments/assets/19abc019-39c7-4ada-9a11-8b33aed87e14" />
+  </p>
 
 ## Installation (macOS DMG)
 

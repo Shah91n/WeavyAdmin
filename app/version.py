@@ -1,3 +1,3 @@
 # Single source of truth for the application version.
 # UpdateCheckWorker and AboutDialog both read from here.
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"

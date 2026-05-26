@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from dialogs.query_profile_dialog import QueryProfileDialog, summarize_profile
 from shared.models.dynamic_weaviate_model import DynamicWeaviateTableModel
 from shared.worker_mixin import WorkerMixin
 
@@ -291,17 +292,22 @@ class BaseSearchView(QWidget, WorkerMixin):
         common_row.addStretch()
         layout.addLayout(common_row)
 
-        # ── Options row: three toggles side by side ──────────────────────
         options_row = QHBoxLayout()
         options_row.setSpacing(20)
 
         self._filter_toggle = QCheckBox("Enable Filters")
         self._metadata_toggle = QCheckBox("Return Metadata")
         self._include_vector_cb = QCheckBox("Include Vectors")
+        self._query_profile_cb = QCheckBox("Query Profile")
+        self._query_profile_cb.setToolTip(
+            "Show per-shard timing breakdown for this query. Adds small "
+            "server-side overhead — use for debugging, not production querying."
+        )
 
         options_row.addWidget(self._filter_toggle)
         options_row.addWidget(self._metadata_toggle)
         options_row.addWidget(self._include_vector_cb)
+        options_row.addWidget(self._query_profile_cb)
         options_row.addStretch()
         layout.addLayout(options_row)
 
@@ -328,6 +334,25 @@ class BaseSearchView(QWidget, WorkerMixin):
         run_row.addWidget(self._status_label)
         run_row.addStretch()
         layout.addLayout(run_row)
+
+        self._profile_banner = QWidget()
+        banner_row = QHBoxLayout(self._profile_banner)
+        banner_row.setContentsMargins(0, 0, 0, 0)
+        banner_row.setSpacing(8)
+        self._profile_summary_label = QLabel("")
+        self._profile_summary_label.setObjectName("secondaryLabel")
+        self._profile_summary_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self._profile_view_btn = QPushButton("View profile")
+        self._profile_view_btn.clicked.connect(self._open_profile_dialog)
+        banner_row.addWidget(self._profile_summary_label)
+        banner_row.addWidget(self._profile_view_btn)
+        banner_row.addStretch()
+        self._profile_banner.setVisible(False)
+        layout.addWidget(self._profile_banner)
+        self._last_profile: dict | None = None
+        self._profile_dialog: QueryProfileDialog | None = None
 
         # Results table
         self._table_model = DynamicWeaviateTableModel(self)
@@ -376,19 +401,51 @@ class BaseSearchView(QWidget, WorkerMixin):
             "filter_spec": filter_spec,
             "include_vector": self._include_vector_cb.isChecked(),
             "return_metadata_fields": metadata,
+            "query_profile": self._query_profile_cb.isChecked(),
         }
 
     def _set_running(self, running: bool) -> None:
         self._run_btn.setEnabled(not running)
         self._status_label.setText("Searching…" if running else "")
 
-    def _on_results(self, results: list) -> None:
+    def _on_results(self, results: list, profile: dict | None = None) -> None:
         self._detach_worker()
         if not self._alive:
             return
         self._set_running(False)
         self._table_model.set_data(results)
         self._status_label.setText(f"{len(results)} result(s)")
+        self._apply_profile(profile)
+
+    def _apply_profile(self, profile: dict | None) -> None:
+        self._last_profile = profile if profile else None
+        if not self._last_profile:
+            self._profile_banner.setVisible(False)
+            if self._profile_dialog is not None:
+                self._profile_dialog.close()
+                self._profile_dialog = None
+            return
+        self._profile_summary_label.setText(summarize_profile(self._last_profile))
+        self._profile_banner.setVisible(True)
+        # Refresh the existing dialog if it's already open so the user doesn't have to re-open it.
+        if self._profile_dialog is not None and self._profile_dialog.isVisible():
+            self._profile_dialog.close()
+            self._profile_dialog = None
+            self._open_profile_dialog()
+
+    def _open_profile_dialog(self) -> None:
+        if not self._last_profile:
+            return
+        if self._profile_dialog is not None:
+            self._profile_dialog.raise_()
+            self._profile_dialog.activateWindow()
+            return
+        self._profile_dialog = QueryProfileDialog(self._last_profile, parent=self)
+        self._profile_dialog.finished.connect(self._on_profile_dialog_closed)
+        self._profile_dialog.show()
+
+    def _on_profile_dialog_closed(self, _result: int) -> None:
+        self._profile_dialog = None
 
     def _on_error(self, message: str) -> None:
         self._detach_worker()
@@ -432,4 +489,7 @@ class BaseSearchView(QWidget, WorkerMixin):
 
     def cleanup(self) -> None:
         self._alive = False
+        if self._profile_dialog is not None:
+            self._profile_dialog.close()
+            self._profile_dialog = None
         super().cleanup()

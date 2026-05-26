@@ -15,20 +15,17 @@ logger = logging.getLogger(__name__)
 class VectorSimilaritySearchWorker(BaseWorker):
     """Dispatches to near_text or near_vector based on params["mode"]."""
 
-    finished = pyqtSignal(list)  # list[dict]
+    finished = pyqtSignal(list, object)  # (list[dict], dict | None)
 
     def __init__(
         self,
         collection_name: str,
         tenant_name: str | None,
         mode: str,  # "near_text" | "near_vector"
-        # near_text params
         query: str | None,
         target_vector: list[str] | str | None,
-        # near_vector params
         near_vector: list[float] | str | None,
         target_vector_single: str | None,
-        # shared
         certainty: float | None,
         distance: float | None,
         limit: int | None,
@@ -37,6 +34,7 @@ class VectorSimilaritySearchWorker(BaseWorker):
         filter_spec: list[dict] | None,
         include_vector: bool,
         return_metadata_fields: list[str] | None,
+        query_profile: bool = False,
     ) -> None:
         super().__init__()
         self._collection_name = collection_name
@@ -54,11 +52,12 @@ class VectorSimilaritySearchWorker(BaseWorker):
         self._filter_spec = filter_spec
         self._include_vector = include_vector
         self._return_metadata_fields = return_metadata_fields
+        self._query_profile = query_profile
 
     def run(self) -> None:
         try:
             if self._mode == "near_vector":
-                results = run_near_vector(
+                results, profile = run_near_vector(
                     collection_name=self._collection_name,
                     tenant_name=self._tenant_name,
                     near_vector=self._near_vector,
@@ -71,9 +70,10 @@ class VectorSimilaritySearchWorker(BaseWorker):
                     filter_spec=self._filter_spec,
                     include_vector=self._include_vector,
                     return_metadata_fields=self._return_metadata_fields,
+                    query_profile=self._query_profile,
                 )
             else:
-                results = run_near_text(
+                results, profile = run_near_text(
                     collection_name=self._collection_name,
                     tenant_name=self._tenant_name,
                     query=self._query or "",
@@ -86,7 +86,8 @@ class VectorSimilaritySearchWorker(BaseWorker):
                     filter_spec=self._filter_spec,
                     include_vector=self._include_vector,
                     return_metadata_fields=self._return_metadata_fields,
+                    query_profile=self._query_profile,
                 )
-            self.finished.emit(results)
+            self.finished.emit(results, profile)
         except Exception as exc:
             self.error.emit(str(exc))

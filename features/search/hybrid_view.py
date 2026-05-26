@@ -194,6 +194,7 @@ class HybridSearchView(BaseSearchView):
             filter_spec=common["filter_spec"],
             include_vector=common["include_vector"],
             return_metadata_fields=common["return_metadata_fields"],
+            query_profile=common["query_profile"],
         )
         self._worker.finished.connect(self._on_results)
         self._worker.error.connect(self._on_error)

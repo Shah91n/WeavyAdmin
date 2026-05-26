@@ -25,8 +25,11 @@ def run_near_text(
     filter_spec: list[dict] | None,
     include_vector: bool,
     return_metadata_fields: list[str] | None,
-) -> list[dict[str, Any]]:
+    query_profile: bool = False,
+) -> tuple[list[dict[str, Any]], dict | None]:
     """Run a near_text (vector similarity via text) search."""
+    from core.weaviate.search.profile import build_metadata_query, extract_query_profile
+
     manager = get_weaviate_manager()
     client = manager.client
     collection = client.collections.use(collection_name)
@@ -52,14 +55,14 @@ def run_near_text(
     if built_filter is not None:
         kwargs["filters"] = built_filter
 
-    if return_metadata_fields:
-        from weaviate.classes.query import MetadataQuery
-
-        kwargs["return_metadata"] = MetadataQuery(**dict.fromkeys(return_metadata_fields, True))
+    mq = build_metadata_query(return_metadata_fields, query_profile)
+    if mq is not None:
+        kwargs["return_metadata"] = mq
 
     result = collection.query.near_text(**kwargs)
     objects = getattr(result, "objects", None) or []
-    return [_item_to_dict(obj, include_vector) for obj in objects]
+    profile = extract_query_profile(result) if query_profile else None
+    return [_item_to_dict(obj, include_vector) for obj in objects], profile
 
 
 def run_near_vector(
@@ -75,15 +78,17 @@ def run_near_vector(
     filter_spec: list[dict] | None,
     include_vector: bool,
     return_metadata_fields: list[str] | None,
-) -> list[dict[str, Any]]:
+    query_profile: bool = False,
+) -> tuple[list[dict[str, Any]], dict | None]:
     """Run a near_vector (raw vector) search."""
+    from core.weaviate.search.profile import build_metadata_query, extract_query_profile
+
     manager = get_weaviate_manager()
     client = manager.client
     collection = client.collections.use(collection_name)
     if tenant_name:
         collection = collection.with_tenant(tenant_name)
 
-    # Accept list[float] or a JSON string representation
     if isinstance(near_vector, str):
         near_vector = json.loads(near_vector)
 
@@ -109,11 +114,11 @@ def run_near_vector(
     if built_filter is not None:
         kwargs["filters"] = built_filter
 
-    if return_metadata_fields:
-        from weaviate.classes.query import MetadataQuery
-
-        kwargs["return_metadata"] = MetadataQuery(**dict.fromkeys(return_metadata_fields, True))
+    mq = build_metadata_query(return_metadata_fields, query_profile)
+    if mq is not None:
+        kwargs["return_metadata"] = mq
 
     result = collection.query.near_vector(**kwargs)
     objects = getattr(result, "objects", None) or []
-    return [_item_to_dict(obj, include_vector) for obj in objects]
+    profile = extract_query_profile(result) if query_profile else None
+    return [_item_to_dict(obj, include_vector) for obj in objects], profile

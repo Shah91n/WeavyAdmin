@@ -1,6 +1,6 @@
 # WeavyAdmin
 
-A desktop admin console for Weaviate vector database clusters.
+WeavyAdmin is an open-source desktop GUI for administering and managing Weaviate vector database clusters to manage collections and schemas, inspect nodes and shards, run keyword/vector/hybrid searches, handle RBAC, ingest CSV data, manage backups, run diagnostics, and operate the underlying Kubernetes infrastructure (GKE/EKS). WeavyAdmin brings the most common administration and operations tasks into a single desktop app.
 
 [![Weaviate](https://img.shields.io/static/v1?label=for&message=Weaviate%20%E2%9D%A4&color=green&style=flat-square)](https://weaviate.io/)
 [![GitHub Repo stars](https://img.shields.io/github/stars/Shah91n/WeavyAdmin?style=social)](https://github.com/Shah91n/WeavyAdmin)

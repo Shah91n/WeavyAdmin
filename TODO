@@ -1,1 +1,4 @@
-- Implement live monitoring dashboard
+- Implement a live monitoring dashboard
+- Logs: add a loading spinner while fetching
+- LB logs aren't easily expandable - improve that
+- Pod Status in Cluster Profiling should be in the same box as Live Logs and print out the same way

@@ -48,6 +48,7 @@ class IngestWorker(QThread):
         is_multi_tenant: bool = False,
         tenant_name: str | None = None,
         vector_column_override: str | None = None,
+        is_create_new: bool = False,
     ):
         """
         Initialize the ingest worker.
@@ -59,6 +60,9 @@ class IngestWorker(QThread):
             is_multi_tenant: Whether to use multi-tenant mode
             tenant_name: Tenant name (required if is_multi_tenant=True)
             vector_column_override: Optional override for vector column detection
+            is_create_new: In MT mode, True when the user explicitly chose
+                "Create New MT Collection" rather than picking an existing one
+                from the list. Used to honor that intent and reject name clashes.
         """
         super().__init__()
         self.file_path = file_path
@@ -67,6 +71,7 @@ class IngestWorker(QThread):
         self.is_multi_tenant = is_multi_tenant
         self.tenant_name = tenant_name
         self.vector_column_override = vector_column_override
+        self.is_create_new = is_create_new
         self._is_running = True
 
     def stop(self):
@@ -231,6 +236,25 @@ class IngestWorker(QThread):
 
         # Check if collection exists
         exists, is_mt = check_collection_mt_status(self.collection_name)
+
+        # Honor the user's explicit choice from the dropdown. "Create New" must
+        # never silently fall through to adding a tenant to a pre-existing
+        # collection — that is exactly how a tenant ends up on the wrong (first)
+        # collection. Likewise, "use existing" must not create a collection.
+        if self.is_create_new and exists:
+            self.error.emit(
+                f"Collection '{self.collection_name}' already exists. "
+                "Select it from the MT Collection list to add a tenant, "
+                "or choose a different name to create a new collection."
+            )
+            return False
+
+        if not self.is_create_new and not exists:
+            self.error.emit(
+                f"Collection '{self.collection_name}' no longer exists. "
+                "Refresh the MT Collection list and try again."
+            )
+            return False
 
         if exists:
             if not is_mt:

@@ -32,11 +32,12 @@ from PyQt6.QtWidgets import (
 
 from features.infra.pods.worker import PodListWorker
 from shared.styles.infra_qss import INFRA_STYLESHEET
+from shared.worker_mixin import WorkerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ProfilingPodSelectorDialog(QDialog):
+class ProfilingPodSelectorDialog(QDialog, WorkerMixin):
     """
     Pod picker for single-pod profiling.
 
@@ -112,6 +113,7 @@ class ProfilingPodSelectorDialog(QDialog):
         self._worker.start()
 
     def _on_pods_ready(self, pods: list) -> None:
+        self._detach_worker()
         weaviate_pods = [
             p["metadata"]["name"]
             for p in pods
@@ -129,8 +131,18 @@ class ProfilingPodSelectorDialog(QDialog):
             self._status_lbl.setText("No weaviate-* pods found – enter name manually.")
 
     def _on_fetch_error(self, msg: str) -> None:
+        self._detach_worker()
         self._status_lbl.setText(f"Could not list pods: {msg}")
         logger.warning("ProfilingPodSelectorDialog pod fetch error: %s", msg)
+
+    def done(self, result: int) -> None:  # type: ignore[override]
+        """Orphan a still-running pod fetch before the dialog is destroyed.
+
+        Without this, closing the dialog while PodListWorker is still running
+        drops the only reference to a running QThread → abort.
+        """
+        self._detach_worker()
+        super().done(result)
 
     # ------------------------------------------------------------------
     # Confirm selection

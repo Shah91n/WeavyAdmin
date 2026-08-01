@@ -3,6 +3,8 @@ UI view for CSV data ingestion with drag-and-drop support.
 Supports both standard and Multi-Tenant collections.
 """
 
+import contextlib
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
@@ -23,6 +25,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.state import AppState
 from core.weaviate.collections import (
     detect_vector_column,
     get_mt_collections,
@@ -95,6 +98,10 @@ class IngestView(QWidget, WorkerMixin):
         self._worker = None
         self.current_file_path = None
         self.init_ui()
+
+        # Listen on the app-wide schema bus so the MT dropdown reflects
+        # collections created anywhere (here, or the Create Collection view).
+        AppState.instance().schema_refreshed.connect(self._on_schema_refreshed)
 
     def init_ui(self) -> None:
         """Initialize the UI."""
@@ -271,10 +278,8 @@ class IngestView(QWidget, WorkerMixin):
         self._set_layout_visible(self.tenant_name_layout_widget, is_mt)
 
         if is_mt:
-            # Populate MT collections dropdown
+            # Populate MT collections dropdown (also syncs name-field visibility)
             self._refresh_mt_collections()
-            # Collection name visibility depends on dropdown selection
-            self._on_mt_collection_changed()
         else:
             # Standard mode: show collection name input
             self.collection_name_label.setText("Collection Name:")
@@ -282,14 +287,30 @@ class IngestView(QWidget, WorkerMixin):
 
         self._validate_inputs()
 
-    def _refresh_mt_collections(self):
-        """Refresh the MT collections dropdown."""
+    def _refresh_mt_collections(self, preserve_selection: bool = True) -> None:
+        """Repopulate the MT collections dropdown from the live schema.
+
+        Keeps the current selection when it still exists so a refresh triggered
+        mid-workflow (e.g. after creating another collection) doesn't yank the
+        user off the collection they were working with.
+        """
+        previous = self.mt_collection_combo.currentData() if preserve_selection else None
+
+        # Block signals during repopulation so _on_mt_collection_changed fires
+        # exactly once, at the end, against the final selection.
+        self.mt_collection_combo.blockSignals(True)
         self.mt_collection_combo.clear()
         self.mt_collection_combo.addItem("<Create New MT Collection>", "__CREATE_NEW__")
-
-        mt_collections = get_mt_collections()
-        for collection_name in mt_collections:
+        for collection_name in get_mt_collections():
             self.mt_collection_combo.addItem(collection_name, collection_name)
+
+        if previous is not None:
+            index = self.mt_collection_combo.findData(previous)
+            self.mt_collection_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.mt_collection_combo.blockSignals(False)
+
+        # Sync the collection-name field visibility to the (possibly new) selection.
+        self._on_mt_collection_changed()
 
     def _on_mt_collection_changed(self):
         """Handle MT collection dropdown change."""
@@ -404,10 +425,12 @@ class IngestView(QWidget, WorkerMixin):
         vectorizer = self.vectorizer_combo.currentData()
         vector_column_override = self.auto_detect_input.text().strip() or None
 
+        is_create_new = False
         if is_mt:
             # MT mode
             selected_data = self.mt_collection_combo.currentData()
-            if selected_data == "__CREATE_NEW__":
+            is_create_new = selected_data == "__CREATE_NEW__"
+            if is_create_new:
                 collection_name = self.collection_name_input.text().strip()
             else:
                 collection_name = selected_data
@@ -429,6 +452,7 @@ class IngestView(QWidget, WorkerMixin):
             is_multi_tenant=is_mt,
             tenant_name=tenant_name,
             vector_column_override=vector_column_override,
+            is_create_new=is_create_new,
         )
 
         # Connect signals
@@ -465,6 +489,21 @@ class IngestView(QWidget, WorkerMixin):
             f"Summary: Total {total_count} | Success {success_count} | Failed {failed_count}"
         )
 
+        # Clear the per-run inputs so the next collection/tenant starts fresh and
+        # can't accidentally reuse the previous run's name.
+        self.collection_name_input.clear()
+        self.tenant_name_input.clear()
+
+        # Announce the schema change on the app-wide bus: refreshes this dropdown,
+        # the sidebar tree, and any other subscriber.
+        AppState.instance().notify_schema_refreshed()
+        self._validate_inputs()
+
+    def _on_schema_refreshed(self) -> None:
+        """Refresh the MT dropdown when the schema changes anywhere in the app."""
+        if self.mt_checkbox.isChecked():
+            self._refresh_mt_collections(preserve_selection=True)
+
     def _on_error(self, error_message: str) -> None:
         """Handle error."""
         self._detach_worker()
@@ -492,4 +531,6 @@ class IngestView(QWidget, WorkerMixin):
 
     def cleanup(self) -> None:
         """Disconnect and orphan/delete the worker on tab close."""
+        with contextlib.suppress(RuntimeError, TypeError):
+            AppState.instance().schema_refreshed.disconnect(self._on_schema_refreshed)
         super().cleanup()

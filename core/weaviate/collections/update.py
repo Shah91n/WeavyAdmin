@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from weaviate.classes.config import (
@@ -104,18 +105,27 @@ def update_collections_replication(
     collection_names: list[str],
     async_enabled: bool | None = None,
     deletion_strategy: Any | None = None,
+    item_callback: Callable[[str, bool, str], None] | None = None,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> dict:
     """Bulk-apply a replication config change to a set of collections.
 
-    Returns a dict ``{"successful": [str], "failed": [(name, error)]}``. The
-    operation does not abort on individual failures — every collection is
-    attempted independently so a partial fix is still useful.
+    Returns a dict ``{"successful": [str], "failed": [(name, error)],
+    "cancelled": bool}``. The operation does not abort on individual failures
+    — every collection is attempted independently so a partial fix is still
+    useful. ``item_callback`` (if given) is invoked after each collection
+    with ``(name, ok, msg)`` so callers can stream progress; ``is_cancelled``
+    is polled before each collection to support cooperative cancellation.
     """
     successful: list[str] = []
     failed: list[tuple[str, str]] = []
+    cancelled = False
     deletion_strategy = _coerce_enum(deletion_strategy, ReplicationDeletionStrategy)
 
     for name in collection_names:
+        if is_cancelled is not None and is_cancelled():
+            cancelled = True
+            break
         ok, msg = update_replication_config(
             name,
             async_enabled=async_enabled,
@@ -125,8 +135,10 @@ def update_collections_replication(
             successful.append(name)
         else:
             failed.append((name, msg))
+        if item_callback is not None:
+            item_callback(name, ok, msg)
 
-    return {"successful": successful, "failed": failed}
+    return {"successful": successful, "failed": failed, "cancelled": cancelled}
 
 
 def get_quantizer_config(

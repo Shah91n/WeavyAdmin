@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 from weaviate.classes.config import ReplicationDeletionStrategy
 
 from core.weaviate.schema import get_all_shards, update_shards_status
+from dialogs.fix_replication_progress_dialog import FixReplicationProgressDialog
 from features.diagnose.fix_replication_worker import FixReplicationWorker
 from features.shards.worker import UpdateShardsStatusWorker
 from shared.worker_mixin import WorkerMixin, _orphan_worker
@@ -150,6 +151,7 @@ class DiagnoseView(QWidget, WorkerMixin):
         self._shard_section_layout: QVBoxLayout | None = None
         self._fix_replication_worker: FixReplicationWorker | None = None
         self._fix_replication_button: QPushButton | None = None
+        self._fix_replication_dialog: FixReplicationProgressDialog | None = None
         self._replication_issue_collections: list[str] = []
         self._build_ui()
 
@@ -634,71 +636,87 @@ class DiagnoseView(QWidget, WorkerMixin):
             self._fix_replication_button.setEnabled(False)
             self._fix_replication_button.setText("Applying replication fix…")
 
-        if self._fix_replication_worker is not None:
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.finished.disconnect()
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.error.disconnect()
-            if self._fix_replication_worker.isRunning():
-                _orphan_worker(self._fix_replication_worker)
-            else:
-                self._fix_replication_worker.deleteLater()
-            self._fix_replication_worker = None
+        self._detach_fix_replication_worker()
 
         self._fix_replication_worker = FixReplicationWorker(
             names,
             async_enabled=True,
             deletion_strategy=ReplicationDeletionStrategy.TIME_BASED_RESOLUTION,
         )
+        self._fix_replication_dialog = FixReplicationProgressDialog(names, self)
+        self._fix_replication_dialog.cancel_requested.connect(
+            self._on_fix_replication_cancel_requested
+        )
+        self._fix_replication_worker.item_done.connect(self._fix_replication_dialog.mark_item)
         self._fix_replication_worker.finished.connect(self._on_fix_replication_finished)
         self._fix_replication_worker.error.connect(self._on_fix_replication_error)
         self._fix_replication_worker.start()
 
-    def _on_fix_replication_finished(self, result: dict) -> None:
+        # exec() blocks here but Qt still pumps events, so worker signals
+        # arrive and update the dialog while it is visible.
+        self._fix_replication_dialog.exec()
+        self._fix_replication_dialog = None
+
+    def _on_fix_replication_cancel_requested(self) -> None:
         if self._fix_replication_worker is not None:
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.finished.disconnect()
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.error.disconnect()
+            self._fix_replication_worker.cancel()
+
+    def _detach_fix_replication_worker(self) -> None:
+        if self._fix_replication_worker is None:
+            return
+        with contextlib.suppress(RuntimeError, TypeError):
+            self._fix_replication_worker.finished.disconnect()
+        with contextlib.suppress(RuntimeError, TypeError):
+            self._fix_replication_worker.error.disconnect()
+        with contextlib.suppress(RuntimeError, TypeError):
+            self._fix_replication_worker.item_done.disconnect()
+        if self._fix_replication_worker.isRunning():
+            _orphan_worker(self._fix_replication_worker)
+        else:
             self._fix_replication_worker.deleteLater()
         self._fix_replication_worker = None
 
+    def _on_fix_replication_finished(self, result: dict) -> None:
+        self._detach_fix_replication_worker()
+
         if self._fix_replication_button is not None:
-            self._fix_replication_button.setText("🛠  Apply Recommended Fix")
+            self._fix_replication_button.setText("Apply Recommended Fix")
             self._fix_replication_button.setEnabled(True)
 
         successful = result.get("successful", [])
         failed = result.get("failed", [])
+        cancelled = result.get("cancelled", False)
 
-        if not failed:
-            QMessageBox.information(
-                self,
-                "Apply Recommended Fix",
-                f"Replication updated on {len(successful)} collection(s).\n\n"
-                "Re-open the Diagnose tab to verify the new configuration.",
+        if cancelled:
+            summary = (
+                f"Cancelled — {len(successful)} updated, {len(failed)} failed, "
+                "remaining collections skipped."
+            )
+        elif failed:
+            summary = (
+                f"Done — {len(successful)} updated, {len(failed)} failed. "
+                "Hover failed rows for details."
             )
         else:
-            details = "\n".join(f"  - {name}: {err}" for name, err in failed)
-            QMessageBox.warning(
-                self,
-                "Apply Recommended Fix",
-                f"Successful: {len(successful)}  ·  Failed: {len(failed)}\n\nErrors:\n{details}",
+            summary = (
+                f"Done — replication updated on {len(successful)} collection(s). "
+                "Re-open the Diagnose tab to verify."
             )
 
+        if self._fix_replication_dialog is not None:
+            self._fix_replication_dialog.mark_complete(summary)
+
     def _on_fix_replication_error(self, error_msg: str) -> None:
-        if self._fix_replication_worker is not None:
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.finished.disconnect()
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.error.disconnect()
-            self._fix_replication_worker.deleteLater()
-        self._fix_replication_worker = None
+        self._detach_fix_replication_worker()
 
         if self._fix_replication_button is not None:
-            self._fix_replication_button.setText("🛠  Apply Recommended Fix")
+            self._fix_replication_button.setText("Apply Recommended Fix")
             self._fix_replication_button.setEnabled(True)
 
-        QMessageBox.critical(self, "Error", f"Replication fix failed:\n{error_msg}")
+        if self._fix_replication_dialog is not None:
+            self._fix_replication_dialog.mark_complete(f"Failed — {error_msg}")
+        else:
+            QMessageBox.critical(self, "Error", f"Replication fix failed:\n{error_msg}")
 
     def _refresh_shard_consistency_after_action(self) -> None:
         try:
@@ -742,16 +760,16 @@ class DiagnoseView(QWidget, WorkerMixin):
             else:
                 self._set_ready_worker.deleteLater()
             self._set_ready_worker = None
+        if self._fix_replication_dialog is not None:
+            with contextlib.suppress(RuntimeError, TypeError):
+                self._fix_replication_dialog.cancel_requested.disconnect()
+            self._fix_replication_dialog.mark_complete("Cancelled — tab closed.")
+            self._fix_replication_dialog.done(0)
+            self._fix_replication_dialog.deleteLater()
+            self._fix_replication_dialog = None
         if self._fix_replication_worker is not None:
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.finished.disconnect()
-            with contextlib.suppress(RuntimeError, TypeError):
-                self._fix_replication_worker.error.disconnect()
-            if self._fix_replication_worker.isRunning():
-                _orphan_worker(self._fix_replication_worker)
-            else:
-                self._fix_replication_worker.deleteLater()
-            self._fix_replication_worker = None
+            self._fix_replication_worker.cancel()
+            self._detach_fix_replication_worker()
 
     # ------------------------------------------------------------------
     # Internal

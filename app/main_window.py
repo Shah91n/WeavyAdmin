@@ -231,6 +231,10 @@ class MainWindow(QMainWindow):
             tab_label="📡 Request Logs",
         )
 
+        # Central schema-change bus: any view that mutates the schema calls
+        # AppState.notify_schema_refreshed(); the sidebar tree reloads in response.
+        self._state.schema_refreshed.connect(self.sidebar.refresh_schema)
+
         # Connect sidebar signals
         self.sidebar.configuration_requested.connect(self._open_configuration_tab)
         self.sidebar.configuration_update_requested.connect(self._open_update_tab)
@@ -770,7 +774,9 @@ class MainWindow(QMainWindow):
                 self.workspace.setCurrentIndex(self.workspace.tab_id_to_index[tab_id])
                 return
             view = CreateCollectionView()
-            view.collection_created.connect(self.sidebar.refresh_schema)
+            # Route through the app-wide bus so every subscriber (sidebar tree,
+            # ingest MT dropdown, …) updates from a single notification.
+            view.collection_created.connect(lambda _name: self._state.notify_schema_refreshed())
             self.workspace.add_tab_with_id(view, tab_id, tab_label, worker=None)
             return
 
@@ -1206,7 +1212,7 @@ class MainWindow(QMainWindow):
         dialog = DeleteCollectionsDialog(names, self)
         dialog.exec()
         if dialog.deleted_any():
-            self.sidebar.refresh_schema()
+            self._state.notify_schema_refreshed()
 
     def _open_collection_read_flow(self, collection_name: str) -> None:
         is_mt_enabled = self._is_multitenancy_enabled(collection_name)

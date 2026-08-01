@@ -53,6 +53,8 @@ _DETACH_SIGNALS: tuple[str, ...] = (
     "goroutine_ready",
     "profile_started",
     "profile_complete",
+    # Diagnose
+    "item_done",
 )
 
 

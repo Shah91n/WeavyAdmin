@@ -12,11 +12,12 @@ from PyQt6.QtWidgets import (
 )
 
 from features.multitenancy.tenant_list_worker import TenantListWorker
+from shared.worker_mixin import WorkerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class TenantSelectorDialog(QDialog):
+class TenantSelectorDialog(QDialog, WorkerMixin):
     """Dialog that loads all tenants for a collection and lets the user pick one."""
 
     def __init__(self, collection_name: str, parent=None) -> None:
@@ -63,7 +64,7 @@ class TenantSelectorDialog(QDialog):
         self._worker.start()
 
     def _on_loaded(self, names: list) -> None:
-        self._worker = None
+        self._detach_worker()
         self._list.clear()
         if not names:
             self._status_label.setText("No tenants found.")
@@ -75,7 +76,7 @@ class TenantSelectorDialog(QDialog):
         self._buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
 
     def _on_error(self, message: str) -> None:
-        self._worker = None
+        self._detach_worker()
         self._status_label.setText("Failed to load tenants.")
         QMessageBox.warning(self, "Tenant Load Error", message)
 
@@ -92,3 +93,13 @@ class TenantSelectorDialog(QDialog):
 
     def get_tenant_name(self) -> str | None:
         return self.selected_tenant_name
+
+    def done(self, result: int) -> None:  # type: ignore[override]
+        """Orphan a still-running tenant fetch before the dialog is destroyed.
+
+        accept(), reject(), Esc, and the window close button all route through
+        done(). Without this, closing the dialog mid-load drops the only
+        reference to a running QThread → "QThread: Destroyed while running".
+        """
+        self._detach_worker()
+        super().done(result)

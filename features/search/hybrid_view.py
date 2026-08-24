@@ -69,11 +69,14 @@ class HybridSearchView(BaseSearchView):
         row1 = QHBoxLayout()
         row1.setSpacing(16)
 
-        row1.addWidget(QLabel("Alpha (BM25 weight):"))
+        row1.addWidget(QLabel("Alpha (vector weight):"))
         self._alpha_spin = QDoubleSpinBox()
+        self._alpha_spin.setToolTip(
+            "0 = pure BM25 keyword search · 1 = pure vector search (server default is 0.75)"
+        )
         self._alpha_spin.setRange(0.0, 1.0)
         self._alpha_spin.setSingleStep(0.05)
-        self._alpha_spin.setValue(0.5)
+        self._alpha_spin.setValue(0.75)
         self._alpha_spin.setFixedWidth(80)
         row1.addWidget(self._alpha_spin)
 
@@ -157,7 +160,7 @@ class HybridSearchView(BaseSearchView):
                     QMessageBox.warning(self, "Invalid Vector", "Vector must be a JSON array.")
                     return
 
-        alpha = self._alpha_spin.value() if self._alpha_spin else 0.5
+        alpha = self._alpha_spin.value() if self._alpha_spin else 0.75
         fusion_type = self._fusion_combo.currentText() if self._fusion_combo else "RELATIVE_SCORE"
         max_dist = self._max_dist_spin.value() if self._max_dist_spin else 0.0
         max_dist = max_dist if max_dist > 0.0 else None

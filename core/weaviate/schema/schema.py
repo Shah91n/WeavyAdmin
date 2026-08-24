@@ -28,3 +28,46 @@ def get_collection_schema(class_name: str) -> dict:
     collection = client.collections.use(class_name)
     config = collection.config.get()
     return config.to_dict()
+
+
+DEFAULT_VECTOR_NAME = "default"
+
+
+def normalize_vector_config(schema: dict) -> dict[str, dict]:
+    """Return a collection's vectors in ``vectorConfig`` shape, whatever the layout.
+
+    Modern collections carry named vectors under ``vectorConfig``. Legacy
+    single-vector collections instead keep ``vectorIndexType``,
+    ``vectorIndexConfig`` and ``vectorizer`` at the top level and have no
+    ``vectorConfig`` key at all — reading only ``vectorConfig`` finds nothing and
+    the UI renders an empty vector list. This synthesises a single ``default``
+    entry for that case so every caller sees one shape.
+
+    Returns ``{}`` only when the schema genuinely describes no vector index.
+    """
+    if not isinstance(schema, dict):
+        return {}
+
+    vector_config = schema.get("vectorConfig")
+    if isinstance(vector_config, dict) and vector_config:
+        return vector_config
+
+    index_config = schema.get("vectorIndexConfig")
+    index_type = schema.get("vectorIndexType")
+    if not isinstance(index_config, dict) and not index_type:
+        return {}
+
+    entry: dict = {
+        "vectorIndexType": index_type or "hnsw",
+        "vectorIndexConfig": index_config if isinstance(index_config, dict) else {},
+    }
+    # Legacy schemas store the vectorizer as a bare module name, not the
+    # {module: settings} mapping vectorConfig uses — normalise it so the
+    # vectorizer view renders the same way for both layouts.
+    vectorizer = schema.get("vectorizer")
+    if isinstance(vectorizer, dict):
+        entry["vectorizer"] = vectorizer
+    elif vectorizer:
+        entry["vectorizer"] = {vectorizer: schema.get("moduleConfig", {}).get(vectorizer, {})}
+
+    return {DEFAULT_VECTOR_NAME: entry}

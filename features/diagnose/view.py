@@ -405,16 +405,16 @@ class DiagnoseView(QWidget, WorkerMixin):
             )
             return
 
+        names = self._extract_collection_names(issues)
         self._root.addWidget(
             _StatusBanner(
-                f"⚠️  {len(issues)} collection(s) without compression — for better memory "
-                "management, enable a quantization method. Weaviate recommends RQ (Rotational "
-                "Quantization); PQ, BQ, or SQ are also valid.",
+                f"⚠️  {len(issues)} vector index(es) across {len(names)} collection(s) without "
+                "compression — for better memory management, enable a quantization method. "
+                "Weaviate recommends RQ (Rotational Quantization); PQ, BQ, or SQ are also valid.",
                 "warning",
             )
         )
 
-        names = self._extract_collection_names(issues)
         section = _CollapsibleSection(f"Show affected collections ({len(names)})", expanded=False)
         section.body_layout.addWidget(self._build_scrollable_list([f"•  {n}" for n in names]))
         self._root.addWidget(section)

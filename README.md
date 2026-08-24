@@ -55,13 +55,14 @@ Install these via your system package manager (Homebrew on macOS) and ensure the
 - **Shards Indexing Status** — view every shard replica, bulk set READONLY → READY, multi-select actions
 - **Shard Rebalancer** — COPY/MOVE replica operations, compute and apply a balance plan, monitor replication operations (requires `REPLICA_MOVEMENT_ENABLED=true`)
 - **Collection Management** — create (Custom Schema or CSV); bulk-delete via the sidebar `×` button with a multi-select picker, filter, and per-collection results
+- **Update Collection Config** — edit the mutable settings of `invertedIndexConfig`, `replicationConfig`, `multiTenancyConfig`, and per-named-vector `vectorIndexConfig`. The vector index form is driven by the collection's actual `vectorIndexType` — **HNSW**, **HFresh**, **Flat**, or **Dynamic** — so only fields Weaviate accepts for that type are offered, along with the active quantizer's tuning fields. Only changed fields are submitted. Compression itself is a create-time decision and is never enabled, disabled or switched from here
 - **Aggregation Report** — per-collection / per-tenant counts with CSV export and a single-collection (or single-tenant) on-demand counter
-- **Schema Diagnostics** — cluster health checks, shard consistency, compression and replication analysis
+- **Schema Diagnostics** — cluster health checks, shard consistency, replication analysis, and per-named-vector compression analysis (reports the vector index type alongside each finding)
 - **Search Data** — right-click any collection → choose BM25 keyword, Vector Similarity (near_text / near_vector), or Hybrid search; supports filters, metadata return, named vectors, and multi-tenancy
 - **RBAC Manager** — create/edit/delete roles, manage DB users and OIDC groups, assign/revoke roles
 - **RBAC Report & Logs** — aggregated insights and authorization audit log viewer
 - **Query Agent** — natural-language chat using the Weaviate Query Agent (Weaviate Cloud only); supports **Ask** (generated answer), **Search** (retrieval only), and **Suggest** (propose example queries for the selected collections, with optional instructions and a configurable suggestion count)
-- **CSV Ingestion** — drag-and-drop CSV import with MT and BYOV support; live log box reports per-batch progress and surfaces each failed object reported by Weaviate
+- **CSV Ingestion** — drag-and-drop CSV import with MT and BYOV support. Uses Weaviate **server-side batching** (`batch.stream()`, Weaviate 1.36+) so the server paces the import; live log box reports progress and surfaces each failed object reported by Weaviate
 - **Backups** — create, restore, cancel backups; usage statistics report
 - **Log Explorer** — live-tail Kubernetes pod logs with structured columns and real-time search
 - **LB Traffic** — HTTP Load Balancer / ALB traffic viewer for GCP and AWS

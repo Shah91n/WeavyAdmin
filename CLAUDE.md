@@ -150,6 +150,50 @@ dialogs/                         Shared QDialogs — not owned by any single fea
 ### Naming
 - Every feature uses the same name across: file, class, sidebar label, tab ID, tab label, QSS object name, signal names. Rename all atomically.
 
+### Weaviate specifics
+These are client/server behaviours that are not visible from the code and have already caused bugs:
+
+- **Named vectors hide the top level.** `collection.config.get().to_dict()` **pops** `vectorIndexType`
+  and `vectorIndexConfig` from the top level whenever `vectorConfig` is present — which is every
+  modern collection, including the single unnamed `default` vector. Anything reading vector index
+  settings must go through `vectorConfig[<name>]` and fall back to the top level only for legacy
+  collections. `core/weaviate/schema/diagnostics.py:iter_vector_indexes()` is the canonical helper —
+  reuse it rather than re-deriving the traversal.
+- **Vector index settings are per-vector and per-type.** Four index types exist: `hnsw`, `flat`,
+  `dynamic`, `hfresh`. Each has a different mutable subset and a different `Reconfigure.VectorIndex.*`
+  builder. Never assume HNSW. The mutable tables in `core/weaviate/collections/update.py`
+  (`_MUTABLE_INDEX_FIELDS`, `_MUTABLE_QUANTIZER_FIELDS`) mirror the immutability rules enforced by
+  Weaviate core in `adapters/repos/db/vector/<type>/config_update.go` — when adding a field, verify
+  against core, not just the docs, and add it to the table rather than to a call site.
+- **Compression is per vector index, not per collection.** One collection can have a compressed and
+  an uncompressed named vector. HFresh always has RQ (mandatory, cannot be disabled); Flat has no
+  user-facing compression decision. **Compression is create-time only** — the update UI retunes an
+  already-active quantizer and never offers enable / disable / switch. Verified against a live
+  cluster: switching quantizers is refused outright ("you must recreate the collection"), and a new
+  HNSW index already has RQ enabled by default on 1.38, so a genuinely uncompressed index is rare.
+  Disabling one is technically accepted by the server but forces a full re-encode, so it is not
+  exposed.
+- **A dynamic index is two indexes.** Core validates its `hnsw` and `flat` halves with those types'
+  own validators, so build each half with its own builder — see `DYNAMIC_SUB_INDEXES`.
+- **The server always emits every quantizer block** (`pq`/`bq`/`sq`/`rq`, no `omitempty`), even when
+  disabled. The Python client's `to_dict()` emits only the active one — do not confuse the two
+  shapes: the client's update path merges against the *server's* JSON, and would `KeyError` on a
+  missing block.
+- **Batch imports use `batch.stream()`** (server-side batching, Weaviate 1.36+) — the server paces
+  the import via backpressure, so no batch size is tuned by hand. There is deliberately no
+  `fixed_size()` fallback: this project targets current clusters only.
+- **`failed_objects` lives on the batch wrapper**, i.e. `collection.batch.failed_objects` after the
+  context exits — *not* on the object the context manager yields. Reading it off the yielded batch
+  silently returns nothing and every failure disappears. For MT, read it off the same
+  `with_tenant()` handle the batch was opened on.
+- **Send only what the user changed.** Reconfigure objects treat `None` as "leave alone", so the
+  update view submits only fields whose widget value differs from the loaded config. Re-sending an
+  untouched quantizer transmits a sub-config the user never edited — and on HFresh that alone
+  triggers a client-side `KeyError: 'pq'`.
+- **Weaviate reports enum *values*, the UI keys on member *names*.** The schema says `"acorn"` /
+  `"TimeBasedResolution"`; the enum members are `ACORN` / `TIME_BASED_RESOLUTION`. Match on both,
+  case-insensitively, or dropdowns never preselect the current value.
+
 ### Code Quality
 - Type hints on all functions including `__init__` and signal handlers.
 - No unused imports, no dead code — remove on every task.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from core.connection.connection_manager import get_weaviate_manager
+from core.weaviate.schema.schema import normalize_vector_config
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,9 @@ def diagnose_schema() -> dict:
     try:
         manager = get_weaviate_manager()
         client = manager.client
-        schema_config = client.collections.list_all()
+        # simple=False returns the full config of every collection in a single
+        # round trip; fetching them one at a time was an N+1 over the cluster.
+        schema_config = client.collections.list_all(simple=False)
     except Exception as e:
         return {"error": f"Failed to retrieve schema: {e}"}
 
@@ -131,18 +134,15 @@ def diagnose_schema() -> dict:
     compression_issues: list[str] = []
     replication_issues: list[str] = []
 
-    for name in schema_config:
+    for name, config in schema_config.items():
         try:
-            collection = client.collections.get(name)
-            full_config = collection.config.get()
-            cfg = full_config.to_dict() if hasattr(full_config, "to_dict") else {}
+            cfg = config.to_dict() if hasattr(config, "to_dict") else {}
         except Exception:
-            logger.warning("diagnose_schema: config fetch failed", exc_info=True)
+            logger.warning("diagnose_schema: config conversion failed", exc_info=True)
             cfg = {}
 
-        comp = _check_compression(cfg)
-        if comp["status"] != "ok":
-            compression_issues.append(f"{name}: {comp['summary']}")
+        for summary in _check_compression(cfg):
+            compression_issues.append(f"{name}: {summary}")
 
         rep = _check_replication(cfg)
         if rep["status"] != "ok":
@@ -159,24 +159,70 @@ def diagnose_schema() -> dict:
 
 _QUANTIZER_KEYS = ("pq", "bq", "sq", "rq")
 
+# Index types where the user does not configure compression at all.
+_COMPRESSION_NOT_APPLICABLE = frozenset({"flat"})
 
-def _check_compression(cfg: dict) -> dict:
-    vi_cfg = cfg.get("vectorIndexConfig") or cfg.get("vectorizer_config") or {}
-    vi_type = cfg.get("vectorIndexType", "hnsw")
-    quantizer = vi_cfg.get("quantizer") if isinstance(vi_cfg.get("quantizer"), dict) else {}
+# HFresh mandates rotational quantization and cannot run uncompressed, so an
+# absent rq block means the schema did not report it — not a real finding.
+_ALWAYS_COMPRESSED = frozenset({"hfresh"})
 
+
+def iter_vector_indexes(cfg: dict) -> list[tuple[str, str, dict]]:
+    """Return ``(vector_name, index_type, index_config)`` for every vector index.
+
+    Both schema layouts are flattened by ``normalize_vector_config``. A
+    ``dynamic`` index is then expanded into its nested ``hnsw`` and ``flat``
+    halves, which is where its quantizer actually lives.
+    """
+    indexes: list[tuple[str, str, dict]] = []
+
+    def add(name: str, index_type: object, index_cfg: object) -> None:
+        resolved_type = str(index_type or "hnsw").lower()
+        resolved_cfg = index_cfg if isinstance(index_cfg, dict) else {}
+        if resolved_type == "dynamic":
+            nested = [
+                (sub, resolved_cfg[sub])
+                for sub in ("hnsw", "flat")
+                if isinstance(resolved_cfg.get(sub), dict)
+            ]
+            if nested:
+                for sub, sub_cfg in nested:
+                    add(f"{name} \u2192 {sub}", sub, sub_cfg)
+                return
+        indexes.append((name, resolved_type, resolved_cfg))
+
+    for vector_name, vector_cfg in normalize_vector_config(cfg).items():
+        if isinstance(vector_cfg, dict):
+            add(vector_name, vector_cfg.get("vectorIndexType"), vector_cfg.get("vectorIndexConfig"))
+    return indexes
+
+
+def active_quantizers(index_cfg: dict) -> list[str]:
+    """Return a readable label for every enabled quantizer on one vector index."""
+    nested = index_cfg.get("quantizer") if isinstance(index_cfg.get("quantizer"), dict) else {}
     active: list[str] = []
     for key in _QUANTIZER_KEYS:
-        q = vi_cfg.get(key) or quantizer.get(key)
-        if isinstance(q, dict) and q.get("enabled"):
-            bits = q.get("bits")
+        quantizer = index_cfg.get(key) or nested.get(key)
+        if isinstance(quantizer, dict) and quantizer.get("enabled"):
+            bits = quantizer.get("bits")
             active.append(f"{key}, {bits}-bit" if isinstance(bits, int) else key)
+    return active
 
-    if active:
-        return {"status": "ok", "summary": f"Compression configured ({'; '.join(active)})"}
-    if str(vi_type).lower() == "flat":
-        return {"status": "ok", "summary": "Flat index — compression not applicable"}
-    return {"status": "warning", "summary": "Compression disabled"}
+
+def _check_compression(cfg: dict) -> list[str]:
+    """Return one summary per vector index that has no compression configured.
+
+    Compression is per vector index, not per collection: a collection with two
+    named vectors can have one compressed and one not.
+    """
+    summaries: list[str] = []
+    for vector_name, index_type, index_cfg in iter_vector_indexes(cfg):
+        if active_quantizers(index_cfg):
+            continue
+        if index_type in _ALWAYS_COMPRESSED or index_type in _COMPRESSION_NOT_APPLICABLE:
+            continue
+        summaries.append(f"vector '{vector_name}' ({index_type}) has compression disabled")
+    return summaries
 
 
 def _check_replication(cfg: dict) -> dict:

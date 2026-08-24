@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from core.weaviate.schema import normalize_vector_config
+
 
 class _SidebarSectionHeader(QWidget):
     """Collapsible section header for a sidebar tree panel.
@@ -491,11 +493,11 @@ class Sidebar(QWidget):
             # Fetch vectorConfig data from the schema
             try:
                 schema = self.get_collection_schema_func(collection_name)
-                vector_config = None
-                if schema and "vectorConfig" in schema:
-                    vector_config = schema["vectorConfig"]
+                # Legacy single-vector collections have no vectorConfig key —
+                # normalize_vector_config synthesises a "default" entry for them.
+                vector_config = normalize_vector_config(schema)
 
-                if isinstance(vector_config, dict) and vector_config:
+                if vector_config:
                     # vector_index_config parent (directly under vectorConfig)
                     vector_index_parent = QTreeWidgetItem(item, ["  🧮  vector_index_config"])
                     vector_index_parent.setData(
@@ -509,9 +511,14 @@ class Sidebar(QWidget):
                     )
 
                     for vector_name in sorted(vector_config.keys()):
+                        # The index type decides which settings exist, so name it
+                        # on the leaf rather than making the user open the tab.
+                        index_type = (vector_config[vector_name] or {}).get(
+                            "vectorIndexType", "hnsw"
+                        )
                         # Vector name under vector_index_config
                         vector_index_child = QTreeWidgetItem(
-                            vector_index_parent, [f"  🔢  {vector_name}"]
+                            vector_index_parent, [f"  🔢  {vector_name} ({index_type})"]
                         )
                         vector_index_child.setData(
                             0,

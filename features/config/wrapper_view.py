@@ -4,6 +4,7 @@ import logging
 
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from core.weaviate.schema import normalize_vector_config
 from features.config.generic_view import ConfigViewGeneric
 
 logger = logging.getLogger(__name__)
@@ -36,8 +37,8 @@ class ConfigViewWrapper(QWidget):
 
         # Header with collection name and config type
         header_layout = QHBoxLayout()
-        header_label = QLabel(display_label)
-        header_layout.addWidget(header_label)
+        self.header_label = QLabel(display_label)
+        header_layout.addWidget(self.header_label)
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
@@ -74,15 +75,29 @@ class ConfigViewWrapper(QWidget):
 
             target_key = key_map.get(config_type_name, config_type_name)
 
-            # Extract the specific vector config
-            if isinstance(config_data, dict) and "vectorConfig" in config_data:
-                vector_config = config_data["vectorConfig"]
-                if isinstance(vector_config, dict) and vector_name in vector_config:
+            # Extract the specific vector config. normalize_vector_config also
+            # covers legacy single-vector collections, which have no vectorConfig.
+            vector_config = normalize_vector_config(config_data)
+            if vector_config:
+                if vector_name in vector_config:
                     vector_specific = vector_config[vector_name]
                     if target_key in vector_specific:
                         data_to_render = vector_specific[target_key]
                     else:
                         data_to_render = vector_specific
+                    # The index config is meaningless without knowing which index
+                    # type it belongs to — hnsw and hfresh share almost no keys.
+                    index_type = vector_specific.get("vectorIndexType")
+                    if config_type_name == "vector_index_config" and index_type:
+                        if isinstance(data_to_render, dict):
+                            data_to_render = {
+                                "vectorIndexType": index_type,
+                                **data_to_render,
+                            }
+                        self.header_label.setText(
+                            f"{self.collection_name} • {vector_name} → "
+                            f"{config_type_name} ({index_type})"
+                        )
                 else:
                     data_to_render = config_data
             else:

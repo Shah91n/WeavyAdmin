@@ -26,7 +26,13 @@ from core.weaviate.collections.batch import (
 from core.weaviate.collections.create import create_collection
 from core.weaviate.collections.delete import bulk_delete_collections, delete_collection
 from core.weaviate.collections.update import (
+    DEFAULT_VECTOR_INDEX_TYPE,
+    DYNAMIC_SUB_INDEXES,
+    build_vector_index_update,
+    get_mutable_index_fields,
+    get_mutable_quantizer_fields,
     get_quantizer_config,
+    normalize_index_type,
     update_collections_replication,
     update_inverted_index_config,
     update_multi_tenancy_config,
@@ -35,6 +41,8 @@ from core.weaviate.collections.update import (
 )
 
 __all__ = [
+    "DEFAULT_VECTOR_INDEX_TYPE",
+    "DYNAMIC_SUB_INDEXES",
     "add_tenant_to_collection",
     "aggregate_collections",
     "aggregate_one_collection",
@@ -42,6 +50,7 @@ __all__ = [
     "batch_ingest_mt",
     "batch_ingest_standard",
     "build_header_map",
+    "build_vector_index_update",
     "bulk_delete_collections",
     "check_collection_mt_status",
     "check_vectorizer_requirements",
@@ -51,12 +60,15 @@ __all__ = [
     "delete_collection",
     "detect_vector_column",
     "get_mt_collections",
+    "get_mutable_index_fields",
+    "get_mutable_quantizer_fields",
     "get_quantizer_config",
     "get_supported_vectorizers",
     "get_total_objects_combined",
     "get_vector_config",
     "list_collections_with_mt_status",
     "map_row_to_properties",
+    "normalize_index_type",
     "parse_vector_value",
     "sanitize_property_name",
     "update_collections_replication",

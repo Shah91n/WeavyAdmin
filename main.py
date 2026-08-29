@@ -15,7 +15,11 @@ from shared.styles.global_qss import GLOBAL_STYLESHEET
 
 logger = logging.getLogger(__name__)
 
-_CRASH_LOG = Path(__file__).parent / "crash.log"
+_CRASH_LOG = (
+    Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    / "weavy-admin"
+    / "crash.log"
+)
 
 
 class _TeeFile:
@@ -27,6 +31,7 @@ class _TeeFile:
     """
 
     def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
         self._file = open(path, "a", buffering=1)  # noqa: SIM115
 
     def write(self, data: str) -> int:

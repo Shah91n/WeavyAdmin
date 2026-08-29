@@ -24,6 +24,33 @@ Download `WeavyAdmin-X.X.X.dmg` from the [Releases](https://github.com/Shah91n/W
 
 This is a one-time step per machine.
 
+## Installation (Linux AppImage)
+
+Download `WeavyAdmin-X.X.X-x86_64.AppImage` from the [Releases](https://github.com/Shah91n/WeavyAdmin/releases) page, make it executable, and run:
+
+```bash
+chmod +x WeavyAdmin-*.AppImage
+./WeavyAdmin-*.AppImage
+```
+
+No Python, Qt, or system dependencies required — everything is bundled.
+
+## Build AppImage from Source
+
+Build your own AppImage on any Linux machine:
+
+```bash
+git clone https://github.com/Shah91n/WeavyAdmin.git
+cd WeavyAdmin
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install appimage
+python -m appimage.build
+```
+
+The AppImage is written to `dist/weavy-admin-x86_64.AppImage`.
+
 ## Run from Source
 
 **Requirements:** Python 3.10+

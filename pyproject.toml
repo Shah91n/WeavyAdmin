@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weavy-admin"
+version = "1.0.0"
+description = "Desktop admin console for Weaviate vector database clusters"
+requires-python = ">=3.11"
+dependencies = [
+    "weaviate-client[agents]",
+    "requests",
+    "PyQt6",
+    "python-dotenv",
+]
+
+[project.scripts]
+weavy-admin = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["app", "app.*", "core", "core.*", "features", "features.*", "shared", "shared.*", "dialogs", "dialogs.*"]
+
+[tool.appimage.build]
+icon = "res/images/weaviate-logo.png"
+packages = ["appimage"]
+
+[tool.appimage.build.extra_files]
+"res" = "python/lib/python3.11/site-packages/res"
